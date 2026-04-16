@@ -114,50 +114,16 @@ export default function TenantProfilePage() {
 
   const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
-    const status = existing?.status || "pending";
+    const currentStatus = existing?.status || "pending";
 
-    // If overdue (pending and past due day), open dialog with late fees
-    const isPastDue = (year < currentYear) || (year === currentYear && m < month) || (year === currentYear && m === month && now.getDate() > (tenant?.payment_day || 10));
-    const isOverdue = status === "pending" && isPastDue;
-
-    if (isOverdue) {
-      setPayMonth(m);
-      setPayStatus("paid_late");
-      setPayLateFee("10");
-      setPayInterest("1");
-      setPayCustomAmount("");
-      setPayDate(new Date().toISOString().split("T")[0]);
-      setPayDialogOpen(true);
-      return;
-    }
-
-    // For paid/pending: single click toggles
-    if (clickTimers.current[m]) {
-      // Double click: if paid -> revert to pending
-      clearTimeout(clickTimers.current[m]);
-      delete clickTimers.current[m];
-      if (status === "paid" || status === "paid_late") {
-        upsertPayment.mutateAsync({
-          tenant_id: id!, month: m, year, status: "pending",
-          amount: rentAmount, paid_at: null, late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success(`${MONTHS[m - 1]} revertido para pendente.`)).catch((e: any) => toast.error(e.message));
-      }
-      return;
-    }
-
-    // Single click: if pending -> mark as paid; if paid -> open detail
-    clickTimers.current[m] = setTimeout(() => {
-      delete clickTimers.current[m];
-      if (status === "pending") {
-        upsertPayment.mutateAsync({
-          tenant_id: id!, month: m, year, status: "paid",
-          amount: rentAmount, paid_at: new Date().toISOString().split("T")[0],
-          late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success(`${MONTHS[m - 1]} marcado como pago!`)).catch((e: any) => toast.error(e.message));
-      } else if (status === "paid" || status === "paid_late") {
-        openPayDetail(m);
-      }
-    }, 300);
+    // Always open dialog with all status options
+    setPayMonth(m);
+    setPayStatus(currentStatus === "pending" ? "paid" : currentStatus as PaymentStatusType);
+    setPayLateFee("10");
+    setPayInterest("1");
+    setPayCustomAmount("");
+    setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
+    setPayDialogOpen(true);
   };
 
   const openPayDetail = (m: number) => {
