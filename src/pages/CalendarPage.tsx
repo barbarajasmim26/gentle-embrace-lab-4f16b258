@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTenants, useAllPayments } from "@/hooks/use-tenants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -225,7 +226,7 @@ export default function CalendarPage() {
 
       {/* Day Detail Dialog */}
       <Dialog open={!!selectedDay} onOpenChange={() => setSelectedDay(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
@@ -233,61 +234,63 @@ export default function CalendarPage() {
             </DialogTitle>
           </DialogHeader>
           {selectedInfo && (
-            <div className="space-y-4">
-              {selectedInfo.paidTenants.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-success flex items-center gap-1.5 mb-2">
-                    <CheckCircle2 className="h-4 w-4" /> Pagos ({selectedInfo.paidTenants.length})
-                  </h3>
-                  {selectedInfo.paidTenants.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-success/5 mb-1 cursor-pointer hover:bg-success/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
-                      <div>
-                        <span className="text-sm font-medium">{t.name}</span>
-                        <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-success">R$ {Number(t.rent_amount).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {selectedInfo.pendingTenants.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-destructive flex items-center gap-1.5 mb-2">
-                    <AlertTriangle className="h-4 w-4" /> Pendentes ({selectedInfo.pendingTenants.length})
-                  </h3>
-                  {selectedInfo.pendingTenants.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-destructive/5 mb-1 cursor-pointer hover:bg-destructive/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
-                      <div>
-                        <span className="text-sm font-medium">{t.name}</span>
-                        <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-destructive">R$ {Number(t.rent_amount).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {selectedInfo.contractEvents.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-warning flex items-center gap-1.5 mb-2">
-                    <Home className="h-4 w-4" /> Contratos
-                  </h3>
-                  {selectedInfo.contractEvents.map((t) => {
-                    const isEntry = t.entry_date && new Date(t.entry_date).getDate() === selectedDay;
-                    return (
-                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-warning/5 mb-1 cursor-pointer hover:bg-warning/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
+            <ScrollArea className="flex-1 overflow-auto pr-3" style={{ maxHeight: "calc(85vh - 120px)" }}>
+              <div className="space-y-4">
+                {selectedInfo.paidTenants.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-success flex items-center gap-1.5 mb-2">
+                      <CheckCircle2 className="h-4 w-4" /> Pagos ({selectedInfo.paidTenants.length})
+                    </h3>
+                    {selectedInfo.paidTenants.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-success/5 mb-1 cursor-pointer hover:bg-success/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
                         <div>
                           <span className="text-sm font-medium">{t.name}</span>
                           <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
                         </div>
-                        <Badge variant="outline" className={`text-[10px] ${isEntry ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                          {isEntry ? "📥 Entrada" : "📤 Saída"}
-                        </Badge>
+                        <span className="text-sm font-semibold text-success">R$ {Number(t.rent_amount).toFixed(2)}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+                {selectedInfo.pendingTenants.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-destructive flex items-center gap-1.5 mb-2">
+                      <AlertTriangle className="h-4 w-4" /> Pendentes ({selectedInfo.pendingTenants.length})
+                    </h3>
+                    {selectedInfo.pendingTenants.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-destructive/5 mb-1 cursor-pointer hover:bg-destructive/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
+                        <div>
+                          <span className="text-sm font-medium">{t.name}</span>
+                          <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-destructive">R$ {Number(t.rent_amount).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedInfo.contractEvents.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-warning flex items-center gap-1.5 mb-2">
+                      <Home className="h-4 w-4" /> Contratos
+                    </h3>
+                    {selectedInfo.contractEvents.map((t) => {
+                      const isEntry = t.entry_date && new Date(t.entry_date).getDate() === selectedDay;
+                      return (
+                        <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-warning/5 mb-1 cursor-pointer hover:bg-warning/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
+                          <div>
+                            <span className="text-sm font-medium">{t.name}</span>
+                            <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
+                          </div>
+                          <Badge variant="outline" className={`text-[10px] ${isEntry ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                            {isEntry ? "📥 Entrada" : "📤 Saída"}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>
