@@ -109,28 +109,58 @@ export default function TenantProfilePage() {
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
-  const openPayDialog = (m: number) => {
-    const existing = getPayment(m);
-    setPayMonth(m);
-    setPayStatus(existing?.status === "paid" || existing?.status === "paid_late" ? "pending" : "paid");
-    setPayLateFee(String(existing?.late_fee_percent ?? 2));
-    setPayInterest(String(existing?.interest_percent ?? 1));
-    setPayCustomAmount("");
-    setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
+  // Single click timeout for double-click detection
+  const clickTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
-    // If already paid, ask to revert
-    if (existing?.status === "paid" || existing?.status === "paid_late") {
-      if (confirm(`${MONTHS[m - 1]} está marcado como pago. Deseja reverter para pendente?`)) {
+  const handlePaymentClick = useCallback((m: number) => {
+    const existing = getPayment(m);
+    const status = existing?.status || "pending";
+
+    // If overdue (pending and past due day in current month/year or past months), open dialog
+    const isPastDue = (year < currentYear) || (year === currentYear && m < month) || (year === currentYear && m === month && now.getDate() > (tenant?.payment_day || 10));
+    const isOverdue = status === "pending" && isPastDue;
+
+    if (isOverdue) {
+      // Open late payment dialog
+      setPayMonth(m);
+      setPayStatus("paid_late");
+      setPayLateFee("2");
+      setPayInterest("1");
+      setPayCustomAmount("");
+      setPayDate(new Date().toISOString().split("T")[0]);
+      setPayDialogOpen(true);
+      return;
+    }
+
+    // For paid/pending: single click toggles
+    if (clickTimers.current[m]) {
+      // Double click: if paid -> revert to pending
+      clearTimeout(clickTimers.current[m]);
+      delete clickTimers.current[m];
+      if (status === "paid" || status === "paid_late") {
         upsertPayment.mutateAsync({
           tenant_id: id!, month: m, year, status: "pending",
           amount: rentAmount, paid_at: null, late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success("Revertido para pendente.")).catch((e: any) => toast.error(e.message));
+        }).then(() => toast.success(`${MONTHS[m - 1]} revertido para pendente.`)).catch((e: any) => toast.error(e.message));
       }
       return;
     }
 
-    setPayDialogOpen(true);
-  };
+    // Single click: if pending -> mark as paid
+    clickTimers.current[m] = setTimeout(() => {
+      delete clickTimers.current[m];
+      if (status === "pending") {
+        upsertPayment.mutateAsync({
+          tenant_id: id!, month: m, year, status: "paid",
+          amount: rentAmount, paid_at: new Date().toISOString().split("T")[0],
+          late_fee_percent: 0, interest_percent: 0,
+        }).then(() => toast.success(`${MONTHS[m - 1]} marcado como pago!`)).catch((e: any) => toast.error(e.message));
+      } else if (status === "paid" || status === "paid_late") {
+        // Single click on paid: open detail
+        openPayDetail(m);
+      }
+    }, 300);
+  }, [payments, year, currentYear, month, now, tenant, id, rentAmount, upsertPayment]);
 
   const openPayDetail = (m: number) => {
     setDetailMonth(m);
