@@ -39,7 +39,7 @@ If a field cannot be found, use empty string "".
 
 Base64 PDF content (first 50000 chars): ${pdf_base64.substring(0, 50000)}`;
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${LOVABLE_API_KEY}`,
