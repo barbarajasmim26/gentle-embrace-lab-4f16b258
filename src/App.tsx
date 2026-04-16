@@ -17,6 +17,7 @@ import ReportsPage from "./pages/ReportsPage";
 import ReceiptPage from "./pages/ReceiptPage";
 import SearchPage from "./pages/SearchPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
+import ContractImportPage from "./pages/ContractImportPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
