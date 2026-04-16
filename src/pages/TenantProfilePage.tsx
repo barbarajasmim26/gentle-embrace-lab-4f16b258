@@ -470,7 +470,7 @@ export default function TenantProfilePage() {
                     <StatusIcon className="h-3 w-3 mr-0.5" />
                     {config.label}
                   </Button>
-                  {isPaid && payment && (
+                  {(isPaid || status === "deposit") && payment && (
                     <div className="space-y-0.5">
                       <p className="text-[9px] text-muted-foreground">
                         R$ {Number(payment.amount || rentAmount).toFixed(2)}
