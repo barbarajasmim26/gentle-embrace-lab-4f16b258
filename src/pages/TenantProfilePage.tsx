@@ -136,13 +136,14 @@ export default function TenantProfilePage() {
     try {
       await upsertPayment.mutateAsync({
         tenant_id: id!, month: payMonth, year,
-        status: payStatus === "paid_late" ? "paid_late" : "paid",
-        amount: finalAmount,
-        paid_at: payDate,
+        status: payStatus,
+        amount: payStatus === "pending" ? rentAmount : finalAmount,
+        paid_at: payStatus === "pending" ? null : payDate,
         late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
         interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
       });
-      toast.success(`${MONTHS[payMonth - 1]} marcado como ${payStatus === "paid_late" ? "pago com atraso" : "pago em dia"}!`);
+      const statusLabels: Record<string, string> = { paid: "pago em dia", paid_late: "pago com atraso", pending: "pendente", deposit: "caução" };
+      toast.success(`${MONTHS[payMonth - 1]} marcado como ${statusLabels[payStatus]}!`);
       setPayDialogOpen(false);
     } catch (e: any) { toast.error(e.message); }
   };
