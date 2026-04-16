@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, useProperties, useAllPayments } from "@/hooks/use-tenants";
 import { useDocuments } from "@/hooks/use-documents";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whatsapp";
 import { generateReceipt } from "@/lib/receipt-generator";
@@ -57,6 +57,9 @@ export default function TenantProfilePage() {
   // Payment detail view
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailMonth, setDetailMonth] = useState(0);
+
+  // Single click timeout ref (must be before early returns)
+  const clickTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -109,27 +112,52 @@ export default function TenantProfilePage() {
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
-  const openPayDialog = (m: number) => {
+  const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
-    setPayMonth(m);
-    setPayStatus(existing?.status === "paid" || existing?.status === "paid_late" ? "pending" : "paid");
-    setPayLateFee(String(existing?.late_fee_percent ?? 2));
-    setPayInterest(String(existing?.interest_percent ?? 1));
-    setPayCustomAmount("");
-    setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
+    const status = existing?.status || "pending";
 
-    // If already paid, ask to revert
-    if (existing?.status === "paid" || existing?.status === "paid_late") {
-      if (confirm(`${MONTHS[m - 1]} está marcado como pago. Deseja reverter para pendente?`)) {
+    // If overdue (pending and past due day), open dialog with late fees
+    const isPastDue = (year < currentYear) || (year === currentYear && m < month) || (year === currentYear && m === month && now.getDate() > (tenant?.payment_day || 10));
+    const isOverdue = status === "pending" && isPastDue;
+
+    if (isOverdue) {
+      setPayMonth(m);
+      setPayStatus("paid_late");
+      setPayLateFee("2");
+      setPayInterest("1");
+      setPayCustomAmount("");
+      setPayDate(new Date().toISOString().split("T")[0]);
+      setPayDialogOpen(true);
+      return;
+    }
+
+    // For paid/pending: single click toggles
+    if (clickTimers.current[m]) {
+      // Double click: if paid -> revert to pending
+      clearTimeout(clickTimers.current[m]);
+      delete clickTimers.current[m];
+      if (status === "paid" || status === "paid_late") {
         upsertPayment.mutateAsync({
           tenant_id: id!, month: m, year, status: "pending",
           amount: rentAmount, paid_at: null, late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success("Revertido para pendente.")).catch((e: any) => toast.error(e.message));
+        }).then(() => toast.success(`${MONTHS[m - 1]} revertido para pendente.`)).catch((e: any) => toast.error(e.message));
       }
       return;
     }
 
-    setPayDialogOpen(true);
+    // Single click: if pending -> mark as paid; if paid -> open detail
+    clickTimers.current[m] = setTimeout(() => {
+      delete clickTimers.current[m];
+      if (status === "pending") {
+        upsertPayment.mutateAsync({
+          tenant_id: id!, month: m, year, status: "paid",
+          amount: rentAmount, paid_at: new Date().toISOString().split("T")[0],
+          late_fee_percent: 0, interest_percent: 0,
+        }).then(() => toast.success(`${MONTHS[m - 1]} marcado como pago!`)).catch((e: any) => toast.error(e.message));
+      } else if (status === "paid" || status === "paid_late") {
+        openPayDetail(m);
+      }
+    }, 300);
   };
 
   const openPayDetail = (m: number) => {
@@ -460,24 +488,26 @@ export default function TenantProfilePage() {
               const payment = getPayment(i + 1);
               const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
               const StatusIcon = config.icon;
+              const isPaid = status === "paid" || status === "paid_late";
               return (
                 <div key={m} className="text-center space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{m}</p>
                   <Button
                     variant="outline" size="sm"
                     className={`w-full text-[10px] rounded-lg ${config.colorClass} hover:opacity-80`}
-                    onClick={() => openPayDialog(i + 1)}
+                    onClick={() => handlePaymentClick(i + 1)}
+                    title={isPaid ? "Clique para detalhes · Duplo clique para reverter" : "Clique para marcar como pago"}
                   >
                     <StatusIcon className="h-3 w-3 mr-0.5" />
                     {config.label}
                   </Button>
-                  {payment && (payment.status === "paid" || payment.status === "paid_late") && (
+                  {isPaid && payment && (
                     <div className="space-y-0.5">
-                      <button className="text-[9px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full" onClick={() => openPayDetail(i + 1)}>
+                      <p className="text-[9px] text-muted-foreground">
                         R$ {Number(payment.amount || rentAmount).toFixed(2)}
-                      </button>
-                      <Button variant="ghost" size="sm" className="w-full text-xs p-0 h-5 rounded-lg" onClick={() => handleReceipt(i + 1)}>
-                        <Receipt className="h-3 w-3" />
+                      </p>
+                      <Button variant="ghost" size="sm" className="w-full text-[10px] p-0 h-6 rounded-lg text-primary hover:text-primary" onClick={() => handleReceipt(i + 1)}>
+                        <Download className="h-3 w-3 mr-0.5" />Recibo
                       </Button>
                     </div>
                   )}
@@ -485,10 +515,11 @@ export default function TenantProfilePage() {
               );
             })}
           </div>
+          <p className="text-[10px] text-muted-foreground mt-3 text-center italic">
+            1 clique = pagar · 2 cliques = reverter para pendente · Atrasado abre janela de multa
+          </p>
         </CardContent>
       </Card>
-
-      {/* Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -586,7 +617,16 @@ export default function TenantProfilePage() {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setDetailOpen(false); openPayDialog(detailMonth); }}>
+                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => {
+                  setDetailOpen(false);
+                  setPayMonth(detailMonth);
+                  setPayStatus(detailPayment?.status === "paid_late" ? "paid_late" : "paid");
+                  setPayLateFee(String(detailPayment?.late_fee_percent ?? 2));
+                  setPayInterest(String(detailPayment?.interest_percent ?? 1));
+                  setPayCustomAmount("");
+                  setPayDate(detailPayment?.paid_at || new Date().toISOString().split("T")[0]);
+                  setPayDialogOpen(true);
+                }}>
                   <Edit className="mr-1 h-3 w-3" />Editar pagamento
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg" onClick={() => handleReceipt(detailMonth)}>
