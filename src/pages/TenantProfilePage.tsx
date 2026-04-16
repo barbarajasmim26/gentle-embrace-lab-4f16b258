@@ -112,8 +112,7 @@ export default function TenantProfilePage() {
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
-  // Single click timeout for double-click detection
-  const clickTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // Use the ref declared before early returns
 
   const handlePaymentClick = useCallback((m: number) => {
     const existing = getPayment(m);
