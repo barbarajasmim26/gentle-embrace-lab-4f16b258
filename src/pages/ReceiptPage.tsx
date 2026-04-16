@@ -165,10 +165,10 @@ export default function ReceiptPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Enviado por</Label>
-              <Input value={paidBy} onChange={(e) => setPaidBy(e.target.value)} placeholder="Deixe vazio se for o próprio inquilino" />
+              <Label>Valor enviado por (opcional)</Label>
+              <Input placeholder="Nome de quem pagou, se diferente" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label>Nome da assinatura</Label>
               <Input value={signatureName} onChange={(e) => setSignatureName(e.target.value || "LOCADOR")} />
             </div>
@@ -205,7 +205,7 @@ export default function ReceiptPage() {
                 {/* Body */}
                 <div style={{ textAlign: "justify", marginBottom: "30px", lineHeight: "2" }}>
                   <p>
-                    Recebi de <strong>{paidBy ? paidBy.toUpperCase() : (tenant?.name?.toUpperCase() || "____________________________")}</strong>, brasileiro(a), CPF n° <strong>{formatCPF(tenant?.cpf)}</strong>, o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao {paymentType} do mês de <strong>{monthName || "__________"} de {year || "______"}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
+                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° <strong>{formatCPF(tenant?.cpf)}</strong>, o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>{paidBy && paidBy !== tenant?.name ? <> por <strong>{paidBy.toUpperCase()}</strong></> : null}, valor este referente ao {paymentType} do mês de <strong>{monthName || "__________"} de {year || "______"}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
                   </p>
                 </div>
 
