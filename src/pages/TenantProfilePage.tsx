@@ -518,6 +518,20 @@ export default function TenantProfilePage() {
                 >
                   <Clock className="mr-1 h-4 w-4" />Pago em atraso
                 </Button>
+                <Button
+                  variant={payStatus === "pending" ? "default" : "outline"}
+                  className={`rounded-lg ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : ""}`}
+                  onClick={() => setPayStatus("pending")}
+                >
+                  <XCircle className="mr-1 h-4 w-4" />Pendente
+                </Button>
+                <Button
+                  variant={payStatus === "deposit" ? "default" : "outline"}
+                  className={`rounded-lg ${payStatus === "deposit" ? "bg-primary hover:bg-primary/90 text-primary-foreground" : ""}`}
+                  onClick={() => setPayStatus("deposit")}
+                >
+                  <DollarSign className="mr-1 h-4 w-4" />Caução
+                </Button>
               </div>
             </div>
 
