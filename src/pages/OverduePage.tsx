@@ -177,6 +177,9 @@ export default function OverduePage() {
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
+                      <Button size="sm" onClick={() => openPayDialog(t)} className="rounded-lg bg-success hover:bg-success/90 text-success-foreground">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />Pago
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => sendOverdueWhatsApp(t)} className="rounded-lg">
                         <MessageCircle className="mr-1 h-3 w-3" />Cobrar
                       </Button>
@@ -191,6 +194,82 @@ export default function OverduePage() {
           })}
         </div>
       )}
+
+      {/* Pay Dialog */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-success" />
+              Registrar Pagamento
+            </DialogTitle>
+          </DialogHeader>
+          {payTenant && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="font-semibold text-sm">{payTenant.name}</p>
+                <p className="text-xs text-muted-foreground">Aluguel: R$ {Number(payTenant.rent_amount).toFixed(2)} · Vencimento: Dia {payTenant.payment_day}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-semibold">Status do pagamento</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant={payStatus === "paid" ? "default" : "outline"}
+                    className={`rounded-lg ${payStatus === "paid" ? "bg-success hover:bg-success/90 text-success-foreground" : ""}`}
+                    onClick={() => setPayStatus("paid")}
+                  >
+                    <CheckCircle2 className="mr-1 h-4 w-4" />Pago em dia
+                  </Button>
+                  <Button
+                    variant={payStatus === "paid_late" ? "default" : "outline"}
+                    className={`rounded-lg ${payStatus === "paid_late" ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}`}
+                    onClick={() => setPayStatus("paid_late")}
+                  >
+                    <Clock className="mr-1 h-4 w-4" />Pago em atraso
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label>Data do pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+
+              {payStatus === "paid_late" && (
+                <div className="space-y-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
+                  <p className="text-sm font-semibold text-warning">Multa e Juros</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Multa (%)</Label>
+                      <Input type="number" step="0.1" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Juros (%)</Label>
+                      <Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {Number(payTenant.rent_amount).toFixed(2)}</span></div>
+                    <div className="flex justify-between text-warning"><span>Multa ({payLateFee}%):</span><span>R$ {(Number(payTenant.rent_amount) * (Number(payLateFee) / 100)).toFixed(2)}</span></div>
+                    <div className="flex justify-between text-warning"><span>Juros ({payInterest}%):</span><span>R$ {(Number(payTenant.rent_amount) * (Number(payInterest) / 100)).toFixed(2)}</span></div>
+                    <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {calcPayAmount().toFixed(2)}</span></div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label>Valor pago (opcional, se diferente)</Label>
+                <Input type="number" step="0.01" placeholder={calcPayAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
+              </div>
+
+              <Button className="w-full rounded-xl bg-success hover:bg-success/90 text-success-foreground" onClick={confirmPayment} disabled={upsertPayment.isPending}>
+                {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcPayAmount().toFixed(2)}`}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
