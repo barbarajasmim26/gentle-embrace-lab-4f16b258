@@ -112,16 +112,15 @@ export default function TenantProfilePage() {
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
-  const handlePaymentClick = useCallback((m: number) => {
+  const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
     const status = existing?.status || "pending";
 
-    // If overdue (pending and past due day in current month/year or past months), open dialog
+    // If overdue (pending and past due day), open dialog with late fees
     const isPastDue = (year < currentYear) || (year === currentYear && m < month) || (year === currentYear && m === month && now.getDate() > (tenant?.payment_day || 10));
     const isOverdue = status === "pending" && isPastDue;
 
     if (isOverdue) {
-      // Open late payment dialog
       setPayMonth(m);
       setPayStatus("paid_late");
       setPayLateFee("2");
@@ -146,7 +145,7 @@ export default function TenantProfilePage() {
       return;
     }
 
-    // Single click: if pending -> mark as paid
+    // Single click: if pending -> mark as paid; if paid -> open detail
     clickTimers.current[m] = setTimeout(() => {
       delete clickTimers.current[m];
       if (status === "pending") {
@@ -156,11 +155,10 @@ export default function TenantProfilePage() {
           late_fee_percent: 0, interest_percent: 0,
         }).then(() => toast.success(`${MONTHS[m - 1]} marcado como pago!`)).catch((e: any) => toast.error(e.message));
       } else if (status === "paid" || status === "paid_late") {
-        // Single click on paid: open detail
         openPayDetail(m);
       }
     }, 300);
-  }, [payments, year, currentYear, month, now, tenant, id, rentAmount, upsertPayment]);
+  };
 
   const openPayDetail = (m: number) => {
     setDetailMonth(m);
