@@ -69,19 +69,17 @@ export function parseReceiptDate(paymentDate: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
     return new Date(`${paymentDate}T12:00:00`);
   }
-
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(paymentDate)) {
     const [day, month, year] = paymentDate.split("/").map(Number);
     return new Date(year, month - 1, day, 12, 0, 0);
   }
-
   const fallback = new Date(paymentDate);
   return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
 }
 
 export function formatReceiptDate(paymentDate: string) {
-  const dateObj = parseReceiptDate(paymentDate);
-  return `Fortaleza ${dateObj.getDate()} de ${MONTHS_PT[dateObj.getMonth()]} de ${dateObj.getFullYear()}`;
+  const d = parseReceiptDate(paymentDate);
+  return `Fortaleza, ${d.getDate()} de ${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
 export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
@@ -91,65 +89,76 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   const contentWidth = pageWidth - margin * 2;
   const monthName = MONTHS_PT[data.month - 1] || "";
   const paymentType = (data.paymentType || "aluguel").toLowerCase();
-  const signatureName = data.signatureName || "Maria Eneide da Silva - LOCADORA";
+  const signatureName = data.signatureName || "Maria Eneide da Silva";
   const address = `${data.address}${data.houseNumber ? `, casa ${data.houseNumber}` : ""}`;
 
-  // --- Logo ---
   let y = 20;
+
+  // --- Logo ---
   try {
     const logoImg = await loadImage(logoSrc);
-    const logoWidth = 62;
+    const logoWidth = 65;
     const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
     doc.addImage(logoImg, "PNG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
-    y += logoHeight + 16;
+    y += logoHeight + 18;
   } catch {
     y += 30;
   }
 
-  // --- Title: RECIBO DE PAGAMENTO (centered, bold) ---
+  // --- Title ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
   doc.text("RECIBO DE PAGAMENTO", pageWidth / 2, y, { align: "center" });
-  y += 16;
+  // underline
+  const titleWidth = doc.getTextWidth("RECIBO DE PAGAMENTO");
+  doc.setDrawColor(0, 0, 0);
+  doc.line((pageWidth - titleWidth) / 2, y + 1.5, (pageWidth + titleWidth) / 2, y + 1.5);
+  y += 20;
 
-  // --- Body: single paragraph, centered, matching the original ---
+  // --- Body ---
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.setTextColor(0, 0, 0);
 
-  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}${data.cpf ? `, inscrito no CPF nº ${data.cpf}` : ""}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName}, do imóvel localizado na ${address}.`;
+  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}${data.cpf ? `, portador(a) do CPF nº ${data.cpf}` : ""}, a quantia de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}), via ${data.paymentMethod.toLowerCase()}, valor este referente ao pagamento de ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado na ${address}.`;
 
   const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
-  doc.text(bodyLines, pageWidth / 2, y, { align: "center", maxWidth: contentWidth });
-  y += bodyLines.length * 6 + 18;
+  doc.text(bodyLines, margin, y);
+  y += bodyLines.length * 6 + 10;
 
-  // --- Date (centered) ---
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  // --- Legal clause ---
+  const clause = "Para maior clareza, firmo o presente recibo para que produza os seus efeitos legais.";
+  const clauseLines = doc.splitTextToSize(clause, contentWidth);
+  doc.text(clauseLines, margin, y);
+  y += clauseLines.length * 6 + 20;
+
+  // --- Date ---
   doc.text(formatReceiptDate(data.paymentDate), pageWidth / 2, y, { align: "center" });
-  y += 22;
+  y += 28;
 
   // --- Signature image ---
   try {
     const signatureImg = await loadImage(signatureSrc);
-    const signatureWidth = 44;
-    const signatureHeight = (signatureImg.height / signatureImg.width) * signatureWidth;
-    doc.addImage(signatureImg, "PNG", (pageWidth - signatureWidth) / 2, y, signatureWidth, signatureHeight);
-    y += signatureHeight + 2;
+    const sigWidth = 55;
+    const sigHeight = (signatureImg.height / signatureImg.width) * sigWidth;
+    doc.addImage(signatureImg, "PNG", (pageWidth - sigWidth) / 2, y, sigWidth, sigHeight);
+    y += sigHeight + 3;
   } catch {
-    y += 18;
+    y += 20;
   }
 
   // --- Line ---
-  doc.setDrawColor(0, 0, 0);
-  doc.line(pageWidth / 2 - 40, y, pageWidth / 2 + 40, y);
+  doc.line(pageWidth / 2 - 42, y, pageWidth / 2 + 42, y);
   y += 6;
 
-  // --- Signature name (centered) ---
-  doc.setFont("helvetica", "normal");
+  // --- Signature name ---
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text(signatureName, pageWidth / 2, y, { align: "center" });
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("LOCADORA", pageWidth / 2, y, { align: "center" });
 
   return doc;
 }
