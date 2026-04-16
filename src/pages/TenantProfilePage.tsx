@@ -58,6 +58,9 @@ export default function TenantProfilePage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailMonth, setDetailMonth] = useState(0);
 
+  // Single click timeout ref (must be before early returns)
+  const clickTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
   const now = new Date();
   const month = now.getMonth() + 1;
 
