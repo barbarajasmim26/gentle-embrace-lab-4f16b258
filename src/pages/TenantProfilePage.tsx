@@ -571,8 +571,8 @@ export default function TenantProfilePage() {
               </div>
             )}
 
-            <Button className="w-full rounded-xl bg-success hover:bg-success/90 text-success-foreground" onClick={confirmPayment} disabled={upsertPayment.isPending}>
-              {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
+            <Button className={`w-full rounded-xl ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : "bg-success hover:bg-success/90 text-success-foreground"}`} onClick={confirmPayment} disabled={upsertPayment.isPending}>
+              {upsertPayment.isPending ? "Salvando..." : payStatus === "pending" ? "Confirmar — Pendente" : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
             </Button>
           </div>
         </DialogContent>
