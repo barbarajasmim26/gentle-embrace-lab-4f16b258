@@ -492,24 +492,26 @@ export default function TenantProfilePage() {
               const payment = getPayment(i + 1);
               const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
               const StatusIcon = config.icon;
+              const isPaid = status === "paid" || status === "paid_late";
               return (
                 <div key={m} className="text-center space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{m}</p>
                   <Button
                     variant="outline" size="sm"
                     className={`w-full text-[10px] rounded-lg ${config.colorClass} hover:opacity-80`}
-                    onClick={() => openPayDialog(i + 1)}
+                    onClick={() => handlePaymentClick(i + 1)}
+                    title={isPaid ? "Clique para detalhes · Duplo clique para reverter" : "Clique para marcar como pago"}
                   >
                     <StatusIcon className="h-3 w-3 mr-0.5" />
                     {config.label}
                   </Button>
-                  {payment && (payment.status === "paid" || payment.status === "paid_late") && (
+                  {isPaid && payment && (
                     <div className="space-y-0.5">
-                      <button className="text-[9px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-full" onClick={() => openPayDetail(i + 1)}>
+                      <p className="text-[9px] text-muted-foreground">
                         R$ {Number(payment.amount || rentAmount).toFixed(2)}
-                      </button>
-                      <Button variant="ghost" size="sm" className="w-full text-xs p-0 h-5 rounded-lg" onClick={() => handleReceipt(i + 1)}>
-                        <Receipt className="h-3 w-3" />
+                      </p>
+                      <Button variant="ghost" size="sm" className="w-full text-[10px] p-0 h-6 rounded-lg text-primary hover:text-primary" onClick={() => handleReceipt(i + 1)}>
+                        <Download className="h-3 w-3 mr-0.5" />Recibo
                       </Button>
                     </div>
                   )}
