@@ -105,10 +105,10 @@ export default function TenantProfilePage() {
 
   // Calculate late fee amount
   const calcFinalAmount = () => {
-    if (payStatus === "paid") return payCustomAmount ? Number(payCustomAmount) : rentAmount;
+    const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
+    if (payStatus === "paid" || payStatus === "pending" || payStatus === "deposit") return base;
     const feePercent = Number(payLateFee) || 0;
     const intPercent = Number(payInterest) || 0;
-    const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
