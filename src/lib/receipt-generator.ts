@@ -60,6 +60,7 @@ export interface ReceiptData {
   paymentType?: string;
   receiptNumber?: string;
   signatureName?: string;
+  paidBy?: string;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
