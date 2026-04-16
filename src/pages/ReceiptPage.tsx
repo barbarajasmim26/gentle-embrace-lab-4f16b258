@@ -27,6 +27,7 @@ export default function ReceiptPage() {
   const [emissionDate, setEmissionDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentMethod, setPaymentMethod] = useState("Pix");
   const [signatureName, setSignatureName] = useState("Maria Eneide da Silva");
+  const [paidBy, setPaidBy] = useState("");
 
   const filteredTenants = useMemo(() => {
     if (!tenants) return [];
@@ -55,8 +56,9 @@ export default function ReceiptPage() {
       paymentMethod,
       paymentType,
       signatureName,
+      paidBy: paidBy || undefined,
     } satisfies ReceiptData;
-  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName]);
+  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName, paidBy]);
 
   const handleGenerate = async (mode: "download" | "print") => {
     if (!previewData) {
