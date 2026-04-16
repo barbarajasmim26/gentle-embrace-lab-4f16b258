@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useProperties, useTenants } from "@/hooks/use-tenants";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, buildReceiptBody, type ReceiptData } from "@/lib/receipt-generator";
+import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, type ReceiptData } from "@/lib/receipt-generator";
 import { toast } from "sonner";
 import { Download, Printer, Receipt } from "lucide-react";
 import logoSrc from "@/assets/logo-mesquita.png";
@@ -40,7 +40,9 @@ export default function ReceiptPage() {
   const monthNumber = Number(month);
   const yearNumber = Number(year);
   const monthName = MONTHS_PT[monthNumber - 1] || "";
-  const fullAddress = `${tenant?.property?.address || "____________________________"}${tenant?.house_number ? `, casa ${tenant.house_number}` : ""}`;
+  const fullAddress = tenant?.property?.address
+    ? `${tenant.property.address}${tenant.house_number ? `, casa ${tenant.house_number}` : ""}`
+    : "____________________________";
 
   const previewData = useMemo(() => {
     if (!tenant) return null;
@@ -78,108 +80,120 @@ export default function ReceiptPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Receipt className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Recibo Profissional</h1>
-            <p className="text-sm text-muted-foreground">Pré-visualização fiel ao PDF final</p>
+            <h1 className="text-2xl font-bold tracking-tight">Emissão de Recibo</h1>
+            <p className="text-sm text-muted-foreground">Gere e salve recibos profissionais</p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => handleGenerate("download")}>
-            <Download className="mr-2 h-4 w-4" />Gerar PDF
+            <Download className="mr-2 h-4 w-4" />Salvar Perfil
           </Button>
           <Button onClick={() => handleGenerate("print")}>
-            <Printer className="mr-2 h-4 w-4" />Imprimir
+            <Printer className="mr-2 h-4 w-4" />Imprimir Recibo
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        {/* Config Panel */}
-        <Card className="rounded-2xl border-border/60 shadow-sm">
-          <CardHeader>
-            <CardDescription>Parâmetros do recibo</CardDescription>
-            <CardTitle>Configuração da emissão</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Propriedade</Label>
-              <Select value={selectedProperty} onValueChange={(v) => { setSelectedProperty(v); setSelectedTenant(""); }}>
-                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Inquilino</Label>
-              <Select value={selectedTenant} onValueChange={setSelectedTenant}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {filteredTenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}{t.house_number ? ` - Casa ${t.house_number}` : ""}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo do pagamento</Label>
-              <Select value={paymentType} onValueChange={setPaymentType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input type="number" step="0.01" placeholder={tenant ? Number(tenant.rent_amount).toFixed(2) : "0,00"} value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Mês de referência</Label>
-              <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MONTHS_PT.map((l, i) => <SelectItem key={l} value={String(i + 1)}>{l.charAt(0).toUpperCase() + l.slice(1)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Ano</Label>
-              <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Data de emissão</Label>
-              <Input type="date" value={emissionDate} onChange={(e) => setEmissionDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHOD_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Valor enviado por (opcional)</Label>
-              <Input placeholder="Nome de quem pagou, se diferente" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Nome da assinatura</Label>
-              <Input value={signatureName} onChange={(e) => setSignatureName(e.target.value || "LOCADOR")} />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Left: Form Sections */}
+        <div className="space-y-5">
+          {/* Section 1 */}
+          <Card className="rounded-2xl border-border/60 shadow-sm">
+            <CardContent className="pt-6 pb-6">
+              <h3 className="text-xs font-semibold tracking-widest text-muted-foreground mb-6">1. SELECIONAR INQUILINO</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Propriedade</Label>
+                  <Select value={selectedProperty} onValueChange={(v) => { setSelectedProperty(v); setSelectedTenant(""); }}>
+                    <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Inquilino</Label>
+                  <Select value={selectedTenant} onValueChange={setSelectedTenant}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {filteredTenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}{t.house_number ? ` - Casa ${t.house_number}` : ""}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* A4 Preview - White document style */}
+          {/* Section 2 */}
+          <Card className="rounded-2xl border-border/60 shadow-sm">
+            <CardContent className="pt-6 pb-6">
+              <h3 className="text-xs font-semibold tracking-widest text-muted-foreground mb-6">2. DADOS DO PAGAMENTO</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Tipo</Label>
+                  <Select value={paymentType} onValueChange={setPaymentType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Valor (R$)</Label>
+                  <Input type="number" step="0.01" placeholder={tenant ? Number(tenant.rent_amount).toFixed(2) : "0,00"} value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Mês Ref.</Label>
+                  <Select value={month} onValueChange={setMonth}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTHS_PT.map((l, i) => <SelectItem key={l} value={String(i + 1)}>{l.charAt(0).toUpperCase() + l.slice(1)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Ano Ref.</Label>
+                  <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Data de emissão</Label>
+                  <Input type="date" value={emissionDate} onChange={(e) => setEmissionDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Forma de pagamento</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHOD_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Valor enviado por (opcional)</Label>
+                  <Input placeholder="Nome de quem pagou, se diferente" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Nome da assinatura</Label>
+                  <Input value={signatureName} onChange={(e) => setSignatureName(e.target.value || "LOCADOR")} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Receipt Preview - always visible */}
         <div className="flex flex-col items-center">
-          <p className="text-sm text-muted-foreground mb-3">Pré-visualização do recibo</p>
+          <p className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-3">Pré-visualização do recibo</p>
           <div
-            className="bg-white text-black shadow-2xl border border-gray-200 mx-auto"
+            className="bg-white text-black shadow-2xl border border-gray-200 mx-auto rounded-sm"
             style={{
               width: "100%",
               maxWidth: "595px",
@@ -190,43 +204,36 @@ export default function ReceiptPage() {
               lineHeight: "1.8",
             }}
           >
-            {previewData ? (
-              <>
-                {/* Logo - left aligned like original */}
-                <div style={{ textAlign: "center", marginBottom: "35px" }}>
-                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto", margin: "0 auto" }} />
-                </div>
+            {/* Logo */}
+            <div style={{ textAlign: "center", marginBottom: "35px" }}>
+              <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto", margin: "0 auto" }} />
+            </div>
 
-                {/* Title */}
-                <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
-                  RECIBO DE PAGAMENTO
-                </h2>
+            {/* Title */}
+            <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
+              RECIBO DE PAGAMENTO
+            </h2>
 
-                {/* Body - centered like original */}
-                <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
-                  <p>
-                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy && paidBy !== tenant?.name ? <> por <strong>{paidBy.toUpperCase()}</strong></> : null}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE
-                  </p>
-                </div>
+            {/* Body - always shown with placeholders */}
+            <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
+              <p>
+                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, inscrito no CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong>, referente ao pagamento de {paymentType} do mês de {monthName || "__________"}, do imóvel situado em {fullAddress}.
+              </p>
+            </div>
 
-                {/* Date */}
-                <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
-                  <p>{formatReceiptDate(emissionDate)}</p>
-                </div>
+            {/* Date */}
+            <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
+              <p>{formatReceiptDate(emissionDate)}</p>
+            </div>
 
-                {/* Signature */}
-                <div style={{ textAlign: "center", marginTop: "20px" }}>
-                  <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
-                  <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
-                    <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ textAlign: "center", color: "#999", paddingTop: "200px" }}>
-                <p>Selecione um inquilino para visualizar o recibo.</p>
+            {/* Signature */}
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
+              <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
+              <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
+                <p style={{ margin: 0 }}>{signatureName}</p>
+                <p style={{ margin: 0, fontSize: "11px", letterSpacing: "1px" }}>LOCADORA</p>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
