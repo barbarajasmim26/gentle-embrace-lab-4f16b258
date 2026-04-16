@@ -17,7 +17,17 @@ export default function OverduePage() {
   const year = now.getFullYear();
   const { data: tenants } = useTenants("active");
   const { data: allPayments } = useAllPayments(year);
+  const upsertPayment = useUpsertPayment();
   const navigate = useNavigate();
+
+  // Pay dialog state
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payTenant, setPayTenant] = useState<any>(null);
+  const [payStatus, setPayStatus] = useState<"paid" | "paid_late">("paid_late");
+  const [payLateFee, setPayLateFee] = useState("2");
+  const [payInterest, setPayInterest] = useState("1");
+  const [payCustomAmount, setPayCustomAmount] = useState("");
+  const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
 
   const getPaymentPattern = (tenantId: string) => {
     const recentPayments: string[] = [];
