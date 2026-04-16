@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { useTenants, useAllPayments, useUpsertPayment } from "@/hooks/use-tenants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, MessageCircle, Eye, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle, MessageCircle, Eye, TrendingUp, TrendingDown, DollarSign, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
