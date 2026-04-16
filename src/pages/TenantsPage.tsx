@@ -24,6 +24,7 @@ export default function TenantsPage() {
   const [form, setForm] = useState({
     name: "", phone: "", house_number: "", rent_amount: "", deposit: "",
     payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "",
+    payment_cycle: "postecipado",
   });
 
   const now = new Date();
@@ -72,11 +73,11 @@ export default function TenantsPage() {
         rent_amount: parseFloat(form.rent_amount), deposit: form.deposit ? parseFloat(form.deposit) : null,
         payment_day: parseInt(form.payment_day) || 10, entry_date: form.entry_date || null,
         exit_date: form.exit_date || null, property_id: form.property_id || null, cpf: form.cpf || null,
-        notes: form.notes || null, status: "active",
+        notes: form.notes || null, status: "active", payment_cycle: form.payment_cycle,
       });
       toast.success("Inquilino criado!");
       setOpen(false);
-      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "" });
+      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "", payment_cycle: "postecipado" });
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -109,6 +110,16 @@ export default function TenantsPage() {
                 <div><Label>Caução (R$)</Label><Input type="number" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} /></div>
               </div>
               <div><Label>Dia do Pagamento</Label><Input type="number" min={1} max={31} value={form.payment_day} onChange={(e) => setForm({ ...form, payment_day: e.target.value })} /></div>
+              <div><Label>Ciclo de Pagamento</Label>
+                <Select value={form.payment_cycle} onValueChange={(v) => setForm({ ...form, payment_cycle: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="antecipado">Antecipado</SelectItem>
+                    <SelectItem value="postecipado">Pós (depois de morar)</SelectItem>
+                    <SelectItem value="personalizado">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Data de Entrada</Label><Input type="date" value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} /></div>
                 <div><Label>Data de Saída</Label><Input type="date" value={form.exit_date} onChange={(e) => setForm({ ...form, exit_date: e.target.value })} /></div>

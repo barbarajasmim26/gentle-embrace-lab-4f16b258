@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { amountInWords, formatReceiptDate, generateReceipt, type ReceiptData } from "@/lib/receipt-generator";
 import { toast } from "sonner";
 import { Download, Printer, Receipt } from "lucide-react";
+import logoSrc from "@/assets/logo-mesquita.png";
+import signatureSrc from "@/assets/signature.png";
 
 const MONTHS_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-
 const PAYMENT_METHOD_OPTIONS = ["Pix", "Dinheiro", "Transferência", "Cartão", "Outro"];
 const PAYMENT_TYPE_OPTIONS = ["aluguel", "caução", "outro"];
 
@@ -25,7 +26,7 @@ export default function ReceiptPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [emissionDate, setEmissionDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentMethod, setPaymentMethod] = useState("Pix");
-  const [signatureName, setSignatureName] = useState("Maria Eneide da Silva - LOCADORA");
+  const [signatureName, setSignatureName] = useState("Maria Eneide da Silva");
 
   const filteredTenants = useMemo(() => {
     if (!tenants) return [];
@@ -38,11 +39,10 @@ export default function ReceiptPage() {
   const monthNumber = Number(month);
   const yearNumber = Number(year);
   const monthName = MONTHS_PT[monthNumber - 1] || "";
-  const receiptNumber = tenant ? `REC-${yearNumber}-${String(monthNumber).padStart(2, "0")}-${tenant.id.slice(0, 6).toUpperCase()}` : `REC-${yearNumber}-${String(monthNumber).padStart(2, "0")}`;
+  const fullAddress = `${tenant?.property?.address || "____________________________"}${tenant?.house_number ? `, casa ${tenant.house_number}` : ""}`;
 
   const previewData = useMemo(() => {
     if (!tenant) return null;
-
     return {
       tenantName: tenant.name,
       cpf: tenant.cpf || undefined,
@@ -54,32 +54,25 @@ export default function ReceiptPage() {
       paymentDate: emissionDate,
       paymentMethod,
       paymentType,
-      receiptNumber,
       signatureName,
     } satisfies ReceiptData;
-  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, receiptNumber, signatureName]);
+  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName]);
 
   const handleGenerate = async (mode: "download" | "print") => {
     if (!previewData) {
       toast.error("Selecione um inquilino para gerar o recibo.");
       return;
     }
-
     const pdf = await generateReceipt(previewData);
-
     if (mode === "download") {
       pdf.save(`recibo_${previewData.tenantName}_${monthName}_${year}.pdf`);
       toast.success("Recibo em PDF gerado com sucesso.");
       return;
     }
-
     const blobUrl = URL.createObjectURL(pdf.output("blob"));
     window.open(blobUrl, "_blank", "noopener,noreferrer");
     toast.success("Prévia do recibo aberta para impressão.");
   };
-
-  const propertyLabel = tenant?.property?.address || "____________________________";
-  const fullAddress = `${propertyLabel}${tenant?.house_number ? `, casa ${tenant.house_number}` : ""}`;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -89,24 +82,23 @@ export default function ReceiptPage() {
             <Receipt className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Recibo profissional</h1>
-            <p className="text-sm text-muted-foreground">Pré-visualização, assinatura e emissão no padrão do sistema anterior.</p>
+            <h1 className="text-2xl font-bold tracking-tight">Recibo Profissional</h1>
+            <p className="text-sm text-muted-foreground">Pré-visualização fiel ao PDF final</p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => handleGenerate("download")}>
-            <Download className="mr-2 h-4 w-4" />
-            Gerar PDF
+            <Download className="mr-2 h-4 w-4" />Gerar PDF
           </Button>
           <Button onClick={() => handleGenerate("print")}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
+            <Printer className="mr-2 h-4 w-4" />Imprimir
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="rounded-[1.75rem] border-border/60 bg-card/95 shadow-sm">
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        {/* Config Panel */}
+        <Card className="rounded-2xl border-border/60 shadow-sm">
           <CardHeader>
             <CardDescription>Parâmetros do recibo</CardDescription>
             <CardTitle>Configuração da emissão</CardTitle>
@@ -114,161 +106,130 @@ export default function ReceiptPage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Propriedade</Label>
-              <Select value={selectedProperty} onValueChange={(value) => { setSelectedProperty(value); setSelectedTenant(""); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
+              <Select value={selectedProperty} onValueChange={(v) => { setSelectedProperty(v); setSelectedTenant(""); }}>
+                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {properties?.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.address}
-                    </SelectItem>
-                  ))}
+                  {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Inquilino</Label>
               <Select value={selectedTenant} onValueChange={setSelectedTenant}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um inquilino" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {filteredTenants.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}{item.house_number ? ` - Casa ${item.house_number}` : ""}
-                    </SelectItem>
-                  ))}
+                  {filteredTenants.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}{t.house_number ? ` - Casa ${t.house_number}` : ""}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Tipo do pagamento</Label>
               <Select value={paymentType} onValueChange={setPaymentType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option.charAt(0).toUpperCase() + option.slice(1)}
-                    </SelectItem>
-                  ))}
+                  {PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder={tenant ? Number(tenant.rent_amount).toFixed(2) : "0,00"}
-                value={customAmount}
-                onChange={(event) => setCustomAmount(event.target.value)}
-              />
+              <Input type="number" step="0.01" placeholder={tenant ? Number(tenant.rent_amount).toFixed(2) : "0,00"} value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} />
             </div>
-
             <div className="space-y-2">
               <Label>Mês de referência</Label>
               <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {MONTHS_PT.map((label, index) => (
-                    <SelectItem key={label} value={String(index + 1)}>
-                      {label.charAt(0).toUpperCase() + label.slice(1)}
-                    </SelectItem>
-                  ))}
+                  {MONTHS_PT.map((l, i) => <SelectItem key={l} value={String(i + 1)}>{l.charAt(0).toUpperCase() + l.slice(1)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label>Ano de referência</Label>
-              <Input type="number" value={year} onChange={(event) => setYear(event.target.value)} />
+              <Label>Ano</Label>
+              <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
             </div>
-
             <div className="space-y-2">
               <Label>Data de emissão</Label>
-              <Input type="date" value={emissionDate} onChange={(event) => setEmissionDate(event.target.value)} />
+              <Input type="date" value={emissionDate} onChange={(e) => setEmissionDate(e.target.value)} />
             </div>
-
             <div className="space-y-2">
               <Label>Forma de pagamento</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHOD_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
+                  {PAYMENT_METHOD_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2 md:col-span-2">
-              <Label>Assinatura</Label>
-              <Input value={signatureName} onChange={(event) => setSignatureName(event.target.value || "LOCADOR")} />
+              <Label>Nome da assinatura</Label>
+              <Input value={signatureName} onChange={(e) => setSignatureName(e.target.value || "LOCADOR")} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.75rem] border-border/60 bg-card/95 shadow-sm">
-          <CardHeader>
-            <CardDescription>Pré-visualização</CardDescription>
-            <CardTitle>Recibo pronto para PDF</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* A4 Preview - White document style */}
+        <div className="flex flex-col items-center">
+          <p className="text-sm text-muted-foreground mb-3">Pré-visualização do recibo</p>
+          <div
+            className="bg-white text-black shadow-2xl border border-gray-200 mx-auto"
+            style={{
+              width: "100%",
+              maxWidth: "595px",
+              minHeight: "842px",
+              padding: "50px 55px",
+              fontFamily: "'Georgia', 'Times New Roman', serif",
+              fontSize: "13px",
+              lineHeight: "1.8",
+            }}
+          >
             {previewData ? (
-              <div className="rounded-[1.75rem] border border-border/70 bg-muted/30 p-8">
-                <div className="flex items-start justify-between gap-4 border-b border-border/70 pb-6">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Recibo de pagamento</p>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-tight">{receiptNumber}</h3>
-                  </div>
-                  <div className="text-right text-sm text-muted-foreground">
-                    <p>Data de emissão</p>
-                    <p className="mt-1 font-medium text-foreground">{formatReceiptDate(emissionDate)}</p>
-                  </div>
+              <>
+                {/* Logo */}
+                <div style={{ textAlign: "center", marginBottom: "30px" }}>
+                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "200px", height: "auto", margin: "0 auto" }} />
                 </div>
 
-                <div className="mt-6 space-y-4 text-sm leading-7 text-foreground/85">
+                {/* Title */}
+                <h2 style={{ textAlign: "center", fontSize: "16px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "30px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
+                  RECIBO DE PAGAMENTO
+                </h2>
+
+                {/* Body */}
+                <div style={{ textAlign: "justify", marginBottom: "30px", lineHeight: "2" }}>
                   <p>
-                    Recebi de <span className="font-semibold text-foreground">{tenant?.name}</span>
-                    {tenant?.cpf ? <> , CPF <span className="font-semibold text-foreground">{tenant.cpf}</span></> : null}, a quantia de <span className="font-semibold text-foreground">R$ {amount.toFixed(2)}</span>.
-                  </p>
-                  <p>
-                    Valor por extenso: <span className="font-semibold text-foreground">{amountInWords(amount)}</span>.
-                  </p>
-                  <p>
-                    Referente ao <span className="font-semibold text-foreground">{paymentType}</span> do mês de <span className="font-semibold text-foreground">{monthName}/{year}</span>, imóvel situado em <span className="font-semibold text-foreground">{fullAddress}</span>.
-                  </p>
-                  <p>
-                    Forma de pagamento: <span className="font-semibold text-foreground">{paymentMethod}</span>.
+                    Recebi de <strong>{tenant?.name?.toUpperCase()}</strong>
+                    {tenant?.cpf ? <>, portador(a) do CPF nº <strong>{tenant.cpf}</strong></> : null}
+                    , a quantia de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}), via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao pagamento de {paymentType} do mês de <strong>{monthName} de {year}</strong>, do imóvel localizado na <strong>{fullAddress}</strong>.
                   </p>
                 </div>
 
-                <div className="mt-10 flex items-end justify-between gap-6 border-t border-border/70 pt-8 text-sm text-muted-foreground">
-                  <div>
-                    <p className="font-medium text-foreground">Assinatura</p>
-                    <p className="mt-2">{signatureName}</p>
-                  </div>
-                  <Button onClick={() => handleGenerate("download")}>Gerar PDF</Button>
+                <p style={{ marginBottom: "10px" }}>
+                  Para maior clareza, firmo o presente recibo para que produza os seus efeitos legais.
+                </p>
+
+                {/* Date */}
+                <div style={{ textAlign: "center", margin: "40px 0 50px" }}>
+                  <p>{formatReceiptDate(emissionDate)}</p>
                 </div>
-              </div>
+
+                {/* Signature */}
+                <div style={{ textAlign: "center", marginTop: "20px" }}>
+                  <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "180px", height: "auto", margin: "0 auto 5px" }} />
+                  <div style={{ width: "250px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
+                    <p style={{ fontWeight: "bold", margin: 0 }}>{signatureName}</p>
+                    <p style={{ margin: 0, fontSize: "12px" }}>LOCADORA</p>
+                  </div>
+                </div>
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground">Selecione um inquilino para visualizar o recibo no padrão anterior.</p>
+              <div style={{ textAlign: "center", color: "#999", paddingTop: "200px" }}>
+                <p>Selecione um inquilino para visualizar o recibo.</p>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

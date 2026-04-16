@@ -15,6 +15,7 @@ export interface Tenant {
   status: string;
   cpf: string | null;
   notes: string | null;
+  payment_cycle: string | null;
   created_at: string;
   updated_at: string;
   property?: { id: string; address: string; name: string | null };

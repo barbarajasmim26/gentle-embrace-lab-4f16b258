@@ -131,6 +131,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          payment_cycle: string | null
           payment_day: number | null
           phone: string | null
           property_id: string | null
@@ -148,6 +149,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          payment_cycle?: string | null
           payment_day?: number | null
           phone?: string | null
           property_id?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          payment_cycle?: string | null
           payment_day?: number | null
           phone?: string | null
           property_id?: string | null
