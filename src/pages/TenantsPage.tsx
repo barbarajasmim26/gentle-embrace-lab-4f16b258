@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -19,6 +19,7 @@ export default function TenantsPage() {
   const createTenant = useCreateTenant();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [filterProperty, setFilterProperty] = useState("all");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "", phone: "", house_number: "", rent_amount: "", deposit: "",
@@ -30,16 +31,17 @@ export default function TenantsPage() {
 
   const filtered = tenants?.filter((t) => {
     const q = search.toLowerCase();
-    return t.name.toLowerCase().includes(q) || t.house_number?.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q);
+    const matchesSearch = t.name.toLowerCase().includes(q) || t.house_number?.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q);
+    const matchesProperty = filterProperty === "all" || t.property_id === filterProperty;
+    return matchesSearch && matchesProperty;
   });
 
-  // Payment pattern helper
   const getPaymentPattern = (tenantId: string) => {
     if (!allPayments) return null;
     const recentPayments: boolean[] = [];
     for (let m = month - 1; m >= Math.max(1, month - 6); m--) {
       const p = allPayments.find((pay: any) => pay.tenant_id === tenantId && pay.month === m);
-      recentPayments.push(p?.status === "paid");
+      recentPayments.push(p?.status === "paid" || p?.status === "paid_late");
     }
     const paidCount = recentPayments.filter(Boolean).length;
     const total = recentPayments.length;
@@ -53,13 +55,13 @@ export default function TenantsPage() {
   const isOverdue = (tenantId: string) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === tenantId && p.month === month);
     const tenant = tenants?.find((t) => t.id === tenantId);
-    if (payment?.status === "paid" || payment?.status === "deposit") return false;
+    if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
     return (tenant?.payment_day || 10) < now.getDate();
   };
 
   const isPaid = (tenantId: string) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === tenantId && p.month === month);
-    return payment?.status === "paid";
+    return payment?.status === "paid" || payment?.status === "paid_late";
   };
 
   const handleCreate = async () => {
@@ -123,9 +125,22 @@ export default function TenantsPage() {
         </Dialog>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nome, casa ou endereço..." className="pl-10 rounded-xl" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Filters row */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nome, casa ou endereço..." className="pl-10 rounded-xl" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={filterProperty} onValueChange={setFilterProperty}>
+          <SelectTrigger className="w-[220px] rounded-xl">
+            <Building className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Condomínio" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os condomínios</SelectItem>
+            {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.address}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (

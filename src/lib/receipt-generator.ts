@@ -81,84 +81,74 @@ export function parseReceiptDate(paymentDate: string) {
 
 export function formatReceiptDate(paymentDate: string) {
   const dateObj = parseReceiptDate(paymentDate);
-  return `Cascavel/CE, ${dateObj.getDate()} de ${MONTHS_PT[dateObj.getMonth()]} de ${dateObj.getFullYear()}`;
+  return `Fortaleza ${dateObj.getDate()} de ${MONTHS_PT[dateObj.getMonth()]} de ${dateObj.getFullYear()}`;
 }
 
 export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 24;
-  const maxWidth = pageWidth - margin * 2;
+  const margin = 30;
+  const contentWidth = pageWidth - margin * 2;
   const monthName = MONTHS_PT[data.month - 1] || "";
   const paymentType = (data.paymentType || "aluguel").toLowerCase();
-  const receiptNumber = data.receiptNumber || `REC-${data.year}-${String(data.month).padStart(2, "0")}`;
-  const signatureName = data.signatureName || "LOCADOR";
+  const signatureName = data.signatureName || "Maria Eneide da Silva - LOCADORA";
   const address = `${data.address}${data.houseNumber ? `, casa ${data.houseNumber}` : ""}`;
 
-  doc.setDrawColor(212, 212, 216);
-  doc.roundedRect(14, 14, pageWidth - 28, 269, 6, 6);
-
+  // --- Logo ---
+  let y = 20;
   try {
     const logoImg = await loadImage(logoSrc);
-    const logoWidth = 56;
+    const logoWidth = 62;
     const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-    doc.addImage(logoImg, "PNG", (pageWidth - logoWidth) / 2, 18, logoWidth, logoHeight);
-  } catch {}
-
-  let y = 50;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("RECIBO DE PAGAMENTO", margin, y);
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
-  doc.text(receiptNumber, pageWidth - margin, y, { align: "right" });
-
-  y += 10;
-  doc.setDrawColor(226, 232, 240);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 12;
-
-  doc.setTextColor(28, 25, 23);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11.5);
-
-  const intro = `Recebi de ${data.tenantName}${data.cpf ? `, CPF ${data.cpf}` : ""}, a quantia de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}).`;
-  const reference = `O valor refere-se ao ${paymentType} do mês de ${monthName}/${data.year}, referente ao imóvel localizado em ${address}.`;
-  const method = `Forma de pagamento: ${data.paymentMethod}.`;
-
-  const paragraphs = [intro, reference, method];
-
-  for (const paragraph of paragraphs) {
-    const lines = doc.splitTextToSize(paragraph, maxWidth);
-    doc.text(lines, margin, y);
-    y += lines.length * 6.5 + 6;
+    doc.addImage(logoImg, "PNG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
+    y += logoHeight + 16;
+  } catch {
+    y += 30;
   }
 
-  y += 8;
-  doc.setFontSize(10.5);
-  doc.setTextColor(87, 83, 78);
-  doc.text(formatReceiptDate(data.paymentDate), pageWidth - margin, y, { align: "right" });
+  // --- Title: RECIBO DE PAGAMENTO (centered, bold) ---
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(0, 0, 0);
+  doc.text("RECIBO DE PAGAMENTO", pageWidth / 2, y, { align: "center" });
+  y += 16;
 
-  y += 18;
+  // --- Body: single paragraph, centered, matching the original ---
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
 
+  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}${data.cpf ? `, inscrito no CPF nº ${data.cpf}` : ""}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName}, do imóvel localizado na ${address}.`;
+
+  const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
+  doc.text(bodyLines, pageWidth / 2, y, { align: "center", maxWidth: contentWidth });
+  y += bodyLines.length * 6 + 18;
+
+  // --- Date (centered) ---
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(formatReceiptDate(data.paymentDate), pageWidth / 2, y, { align: "center" });
+  y += 22;
+
+  // --- Signature image ---
   try {
     const signatureImg = await loadImage(signatureSrc);
-    const signatureWidth = 42;
+    const signatureWidth = 44;
     const signatureHeight = (signatureImg.height / signatureImg.width) * signatureWidth;
     doc.addImage(signatureImg, "PNG", (pageWidth - signatureWidth) / 2, y, signatureWidth, signatureHeight);
     y += signatureHeight + 2;
   } catch {
-    y += 16;
+    y += 18;
   }
 
-  doc.setDrawColor(63, 63, 70);
-  doc.line(pageWidth / 2 - 34, y, pageWidth / 2 + 34, y);
+  // --- Line ---
+  doc.setDrawColor(0, 0, 0);
+  doc.line(pageWidth / 2 - 40, y, pageWidth / 2 + 40, y);
   y += 6;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(28, 25, 23);
+  // --- Signature name (centered) ---
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
   doc.text(signatureName, pageWidth / 2, y, { align: "center" });
 
   return doc;
