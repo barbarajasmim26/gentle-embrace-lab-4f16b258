@@ -113,12 +113,12 @@ export default function WhatsAppPage() {
     setEditingTemplate(false);
   };
 
-  const isModified = template !== "custom" && templates[template as keyof SavedTemplates] !== defaults[template as keyof SavedTemplates];
+  const isModified = template !== "custom" && templates[template] !== defaults[template];
 
   const tenant = tenants?.find((t) => t.id === singleTenant);
   const previewMessage = mode === "individual" && tenant
     ? getMessageForTenant(singleTenant)
-    : template === "custom" ? customMessage : (template !== "custom" ? templates[template as keyof SavedTemplates] : "");
+    : template === "custom" ? customMessage : templates[template];
 
   return (
     <div className="space-y-6 animate-fade-in">
