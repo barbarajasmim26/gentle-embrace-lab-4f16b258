@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, useProperties, useAllPayments } from "@/hooks/use-tenants";
 import { useDocuments } from "@/hooks/use-documents";
@@ -59,7 +59,7 @@ export default function TenantProfilePage() {
   const [detailMonth, setDetailMonth] = useState(0);
 
   // Single click timeout ref (must be before early returns)
-  const clickTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -105,59 +105,25 @@ export default function TenantProfilePage() {
 
   // Calculate late fee amount
   const calcFinalAmount = () => {
-    if (payStatus === "paid") return payCustomAmount ? Number(payCustomAmount) : rentAmount;
+    const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
+    if (payStatus === "paid" || payStatus === "pending" || payStatus === "deposit") return base;
     const feePercent = Number(payLateFee) || 0;
     const intPercent = Number(payInterest) || 0;
-    const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
   const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
-    const status = existing?.status || "pending";
+    const currentStatus = existing?.status || "pending";
 
-    // If overdue (pending and past due day), open dialog with late fees
-    const isPastDue = (year < currentYear) || (year === currentYear && m < month) || (year === currentYear && m === month && now.getDate() > (tenant?.payment_day || 10));
-    const isOverdue = status === "pending" && isPastDue;
-
-    if (isOverdue) {
-      setPayMonth(m);
-      setPayStatus("paid_late");
-      setPayLateFee("10");
-      setPayInterest("1");
-      setPayCustomAmount("");
-      setPayDate(new Date().toISOString().split("T")[0]);
-      setPayDialogOpen(true);
-      return;
-    }
-
-    // For paid/pending: single click toggles
-    if (clickTimers.current[m]) {
-      // Double click: if paid -> revert to pending
-      clearTimeout(clickTimers.current[m]);
-      delete clickTimers.current[m];
-      if (status === "paid" || status === "paid_late") {
-        upsertPayment.mutateAsync({
-          tenant_id: id!, month: m, year, status: "pending",
-          amount: rentAmount, paid_at: null, late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success(`${MONTHS[m - 1]} revertido para pendente.`)).catch((e: any) => toast.error(e.message));
-      }
-      return;
-    }
-
-    // Single click: if pending -> mark as paid; if paid -> open detail
-    clickTimers.current[m] = setTimeout(() => {
-      delete clickTimers.current[m];
-      if (status === "pending") {
-        upsertPayment.mutateAsync({
-          tenant_id: id!, month: m, year, status: "paid",
-          amount: rentAmount, paid_at: new Date().toISOString().split("T")[0],
-          late_fee_percent: 0, interest_percent: 0,
-        }).then(() => toast.success(`${MONTHS[m - 1]} marcado como pago!`)).catch((e: any) => toast.error(e.message));
-      } else if (status === "paid" || status === "paid_late") {
-        openPayDetail(m);
-      }
-    }, 300);
+    // Always open dialog with all status options
+    setPayMonth(m);
+    setPayStatus(currentStatus === "pending" ? "paid" : currentStatus as PaymentStatusType);
+    setPayLateFee("10");
+    setPayInterest("1");
+    setPayCustomAmount("");
+    setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
+    setPayDialogOpen(true);
   };
 
   const openPayDetail = (m: number) => {
@@ -170,13 +136,14 @@ export default function TenantProfilePage() {
     try {
       await upsertPayment.mutateAsync({
         tenant_id: id!, month: payMonth, year,
-        status: payStatus === "paid_late" ? "paid_late" : "paid",
-        amount: finalAmount,
-        paid_at: payDate,
+        status: payStatus,
+        amount: payStatus === "pending" ? rentAmount : finalAmount,
+        paid_at: payStatus === "pending" ? null : payDate,
         late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
         interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
       });
-      toast.success(`${MONTHS[payMonth - 1]} marcado como ${payStatus === "paid_late" ? "pago com atraso" : "pago em dia"}!`);
+      const statusLabels: Record<string, string> = { paid: "pago em dia", paid_late: "pago com atraso", pending: "pendente", deposit: "caução" };
+      toast.success(`${MONTHS[payMonth - 1]} marcado como ${statusLabels[payStatus]}!`);
       setPayDialogOpen(false);
     } catch (e: any) { toast.error(e.message); }
   };
@@ -516,7 +483,7 @@ export default function TenantProfilePage() {
             })}
           </div>
           <p className="text-[10px] text-muted-foreground mt-3 text-center italic">
-            1 clique = pagar · 2 cliques = reverter para pendente · Atrasado abre janela de multa
+            Clique no mês para alterar o status do pagamento
           </p>
         </CardContent>
       </Card>
@@ -551,13 +518,29 @@ export default function TenantProfilePage() {
                 >
                   <Clock className="mr-1 h-4 w-4" />Pago em atraso
                 </Button>
+                <Button
+                  variant={payStatus === "pending" ? "default" : "outline"}
+                  className={`rounded-lg ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : ""}`}
+                  onClick={() => setPayStatus("pending")}
+                >
+                  <XCircle className="mr-1 h-4 w-4" />Pendente
+                </Button>
+                <Button
+                  variant={payStatus === "deposit" ? "default" : "outline"}
+                  className={`rounded-lg ${payStatus === "deposit" ? "bg-primary hover:bg-primary/90 text-primary-foreground" : ""}`}
+                  onClick={() => setPayStatus("deposit")}
+                >
+                  <DollarSign className="mr-1 h-4 w-4" />Caução
+                </Button>
               </div>
             </div>
 
-            <div>
-              <Label>Data do pagamento</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
+            {payStatus !== "pending" && (
+              <div>
+                <Label>Data do pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+            )}
 
             {payStatus === "paid_late" && (
               <div className="space-y-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
@@ -581,13 +564,15 @@ export default function TenantProfilePage() {
               </div>
             )}
 
-            <div>
-              <Label>Valor pago (opcional, se diferente)</Label>
-              <Input type="number" step="0.01" placeholder={calcFinalAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
-            </div>
+            {payStatus !== "pending" && (
+              <div>
+                <Label>Valor pago (opcional, se diferente)</Label>
+                <Input type="number" step="0.01" placeholder={calcFinalAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
+              </div>
+            )}
 
-            <Button className="w-full rounded-xl bg-success hover:bg-success/90 text-success-foreground" onClick={confirmPayment} disabled={upsertPayment.isPending}>
-              {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
+            <Button className={`w-full rounded-xl ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : "bg-success hover:bg-success/90 text-success-foreground"}`} onClick={confirmPayment} disabled={upsertPayment.isPending}>
+              {upsertPayment.isPending ? "Salvando..." : payStatus === "pending" ? "Confirmar — Pendente" : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
             </Button>
           </div>
         </DialogContent>
