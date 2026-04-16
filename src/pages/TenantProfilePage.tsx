@@ -242,7 +242,7 @@ export default function TenantProfilePage() {
 
   const sendOverdueWhatsApp = () => {
     if (!tenant.phone) { toast.error("Telefone não cadastrado."); return; }
-    const fee = rentAmount * 0.02;
+    const fee = rentAmount * 0.10;
     const interest = rentAmount * 0.01;
     const total = rentAmount + fee + interest;
     const templates = getMessageTemplates({
