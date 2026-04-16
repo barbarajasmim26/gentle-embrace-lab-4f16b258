@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, UserX, AlertTriangle, Bell, Calendar, BarChart3, Receipt, Search, MessageCircle, LogOut, Home } from "lucide-react";
+import { LayoutDashboard, FileText, UserX, AlertTriangle, Bell, Calendar, BarChart3, Receipt, Search, MessageCircle, LogOut, Home, Upload } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ const mainItems = [
 ];
 
 const toolItems = [
+  { title: "Importar Contrato", url: "/import-contract", icon: Upload },
   { title: "Calendário", url: "/calendar", icon: Calendar },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Recibo", url: "/receipt", icon: Receipt },
