@@ -74,6 +74,39 @@ export default function OverduePage() {
     return sum + total;
   }, 0);
 
+  const openPayDialog = (t: any) => {
+    setPayTenant(t);
+    setPayStatus("paid_late");
+    setPayLateFee("2");
+    setPayInterest("1");
+    setPayCustomAmount("");
+    setPayDate(new Date().toISOString().split("T")[0]);
+    setPayDialogOpen(true);
+  };
+
+  const calcPayAmount = () => {
+    if (!payTenant) return 0;
+    const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
+    if (payStatus === "paid") return base;
+    return base + base * (Number(payLateFee) / 100) + base * (Number(payInterest) / 100);
+  };
+
+  const confirmPayment = async () => {
+    if (!payTenant) return;
+    try {
+      await upsertPayment.mutateAsync({
+        tenant_id: payTenant.id, month, year,
+        status: payStatus,
+        amount: calcPayAmount(),
+        paid_at: payDate,
+        late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
+        interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
+      });
+      toast.success(`${payTenant.name} marcado como pago!`);
+      setPayDialogOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+  };
+
   const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
