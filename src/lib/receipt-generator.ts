@@ -40,6 +40,13 @@ export function amountInWords(value: number): string {
   return result;
 }
 
+export function formatCPF(cpf: string | undefined | null): string {
+  if (!cpf) return "____________________";
+  const clean = cpf.replace(/\D/g, "");
+  if (clean.length !== 11) return cpf;
+  return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9, 11)}`;
+}
+
 export interface ReceiptData {
   tenantName: string;
   cpf?: string;
@@ -120,7 +127,8 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
 
-  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a),${data.cpf ? ` CPF n° ${data.cpf},` : ""} o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
+  const formattedCPF = formatCPF(data.cpf);
+  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a), CPF n° ${formattedCPF}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
 
   const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
   doc.text(bodyLines, margin, y);

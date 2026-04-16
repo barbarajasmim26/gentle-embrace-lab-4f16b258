@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { amountInWords, formatReceiptDate, generateReceipt, type ReceiptData } from "@/lib/receipt-generator";
+import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, type ReceiptData } from "@/lib/receipt-generator";
 import { toast } from "sonner";
 import { Download, Printer, Receipt } from "lucide-react";
 import logoSrc from "@/assets/logo-mesquita.png";
@@ -199,9 +199,7 @@ export default function ReceiptPage() {
                 {/* Body */}
                 <div style={{ textAlign: "justify", marginBottom: "30px", lineHeight: "2" }}>
                   <p>
-                    Recebi de <strong>{tenant?.name?.toUpperCase()}</strong>, brasileiro(a),
-                    {tenant?.cpf ? <> CPF n° <strong>{tenant.cpf}</strong>,</> : null}
-                    {" "}o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao {paymentType} do mês de <strong>{monthName} de {year}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
+                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° <strong>{formatCPF(tenant?.cpf)}</strong>, o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao {paymentType} do mês de <strong>{monthName || "__________"} de {year || "______"}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
                   </p>
                 </div>
 
