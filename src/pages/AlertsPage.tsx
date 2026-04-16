@@ -110,6 +110,9 @@ export default function AlertsPage() {
                         <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={(e) => openRenew(t, e)}>
                           <RefreshCw className="h-3.5 w-3.5" /> Renovar
                         </Button>
+                        <Button size="sm" variant="outline" className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10 gap-1" onClick={(e) => handleNotRenew(t, e)}>
+                          <XCircle className="h-3.5 w-3.5" /> Não Renovar
+                        </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </CardContent>
@@ -153,6 +156,9 @@ export default function AlertsPage() {
                       <div className="flex items-center gap-2">
                         <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={(e) => openRenew(t, e)}>
                           <RefreshCw className="h-3.5 w-3.5" /> Renovar
+                        </Button>
+                        <Button size="sm" variant="outline" className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10 gap-1" onClick={(e) => handleNotRenew(t, e)}>
+                          <XCircle className="h-3.5 w-3.5" /> Não Renovar
                         </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
