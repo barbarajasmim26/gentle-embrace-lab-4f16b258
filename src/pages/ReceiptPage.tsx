@@ -199,15 +199,11 @@ export default function ReceiptPage() {
                 {/* Body */}
                 <div style={{ textAlign: "justify", marginBottom: "30px", lineHeight: "2" }}>
                   <p>
-                    Recebi de <strong>{tenant?.name?.toUpperCase()}</strong>
-                    {tenant?.cpf ? <>, portador(a) do CPF nº <strong>{tenant.cpf}</strong></> : null}
-                    , a quantia de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}), via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao pagamento de {paymentType} do mês de <strong>{monthName} de {year}</strong>, do imóvel localizado na <strong>{fullAddress}</strong>.
+                    Recebi de <strong>{tenant?.name?.toUpperCase()}</strong>, brasileiro(a),
+                    {tenant?.cpf ? <> CPF n° <strong>{tenant.cpf}</strong>,</> : null}
+                    {" "}o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>, valor este referente ao {paymentType} do mês de <strong>{monthName} de {year}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
                   </p>
                 </div>
-
-                <p style={{ marginBottom: "10px" }}>
-                  Para maior clareza, firmo o presente recibo para que produza os seus efeitos legais.
-                </p>
 
                 {/* Date */}
                 <div style={{ textAlign: "center", margin: "40px 0 50px" }}>
