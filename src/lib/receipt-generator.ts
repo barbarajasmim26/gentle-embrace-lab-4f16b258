@@ -87,7 +87,22 @@ export function parseReceiptDate(paymentDate: string) {
 
 export function formatReceiptDate(paymentDate: string) {
   const d = parseReceiptDate(paymentDate);
-  return `Fortaleza, ${d.getDate()} de ${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
+  return `Fortaleza ${d.getDate()} de ${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+export function buildReceiptBody(data: ReceiptData): string {
+  const monthName = MONTHS_PT[data.month - 1] || "";
+  const paymentType = (data.paymentType || "aluguel").toLowerCase();
+  const formattedCPF = formatCPF(data.cpf);
+  const displayName = data.paidBy && data.paidBy !== data.tenantName
+    ? data.paidBy.toUpperCase()
+    : data.tenantName.toUpperCase();
+  const paidByText = data.paidBy && data.paidBy !== data.tenantName
+    ? ` por ${data.paidBy.toUpperCase()}`
+    : "";
+  const addressPart = `na ${data.address}, casa ${data.houseNumber || "___"}`;
+
+  return `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a), CPF n° ${formattedCPF}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}${paidByText}, valor este referente ao ${paymentType} do mês de ${monthName}, do imóvel localizado ${addressPart} - Cascavel - CE`;
 }
 
 export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
@@ -95,50 +110,44 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 30;
   const contentWidth = pageWidth - margin * 2;
-  const monthName = MONTHS_PT[data.month - 1] || "";
-  const paymentType = (data.paymentType || "aluguel").toLowerCase();
   const signatureName = data.signatureName || "Maria Eneide da Silva";
-  const address = `${data.address}${data.houseNumber ? `, casa ${data.houseNumber}` : ""}`;
 
   let y = 20;
 
-  // --- Logo ---
+  // --- Logo (left-aligned like original) ---
   try {
     const logoImg = await loadImage(logoSrc);
-    const logoWidth = 65;
+    const logoWidth = 70;
     const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-    doc.addImage(logoImg, "PNG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
-    y += logoHeight + 18;
+    doc.addImage(logoImg, "PNG", margin, y, logoWidth, logoHeight);
+    y += logoHeight + 22;
   } catch {
     y += 30;
   }
 
   // --- Title ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(0, 0, 0);
   doc.text("RECIBO DE PAGAMENTO", pageWidth / 2, y, { align: "center" });
   // underline
   const titleWidth = doc.getTextWidth("RECIBO DE PAGAMENTO");
   doc.setDrawColor(0, 0, 0);
   doc.line((pageWidth - titleWidth) / 2, y + 1.5, (pageWidth + titleWidth) / 2, y + 1.5);
-  y += 20;
+  y += 18;
 
-  // --- Body ---
+  // --- Body (centered text like original) ---
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
 
-  const formattedCPF = formatCPF(data.cpf);
-  const paidByText = data.paidBy && data.paidBy !== data.tenantName ? ` por ${data.paidBy.toUpperCase()}` : "";
-  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a), CPF n° ${formattedCPF}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}${paidByText}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
-
+  const bodyText = buildReceiptBody(data);
   const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
-  doc.text(bodyLines, margin, y);
-  y += bodyLines.length * 6 + 20;
+  doc.text(bodyLines, pageWidth / 2, y, { align: "center" });
+  y += bodyLines.length * 6 + 22;
 
   // --- Date ---
   doc.text(formatReceiptDate(data.paymentDate), pageWidth / 2, y, { align: "center" });
-  y += 28;
+  y += 30;
 
   // --- Signature image ---
   try {
@@ -146,23 +155,19 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
     const sigWidth = 55;
     const sigHeight = (signatureImg.height / signatureImg.width) * sigWidth;
     doc.addImage(signatureImg, "PNG", (pageWidth - sigWidth) / 2, y, sigWidth, sigHeight);
-    y += sigHeight + 3;
+    y += sigHeight + 2;
   } catch {
     y += 20;
   }
 
   // --- Line ---
-  doc.line(pageWidth / 2 - 42, y, pageWidth / 2 + 42, y);
-  y += 6;
+  doc.line(pageWidth / 2 - 45, y, pageWidth / 2 + 45, y);
+  y += 7;
 
-  // --- Signature name ---
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(signatureName, pageWidth / 2, y, { align: "center" });
-  y += 5;
+  // --- Signature name - single line like original ---
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text("LOCADORA", pageWidth / 2, y, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(`${signatureName} - LOCADORA`, pageWidth / 2, y, { align: "center" });
 
   return doc;
 }
