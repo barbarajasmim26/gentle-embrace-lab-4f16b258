@@ -164,6 +164,10 @@ export default function ReceiptPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Valor enviado por (opcional)</Label>
+              <Input placeholder="Nome de quem pagou, se diferente" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} />
+            </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Nome da assinatura</Label>
               <Input value={signatureName} onChange={(e) => setSignatureName(e.target.value || "LOCADOR")} />
