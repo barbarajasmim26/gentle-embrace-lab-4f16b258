@@ -120,17 +120,11 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
 
-  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}${data.cpf ? `, portador(a) do CPF nº ${data.cpf}` : ""}, a quantia de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}), via ${data.paymentMethod.toLowerCase()}, valor este referente ao pagamento de ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado na ${address}.`;
+  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a),${data.cpf ? ` CPF n° ${data.cpf},` : ""} o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
 
   const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
   doc.text(bodyLines, margin, y);
-  y += bodyLines.length * 6 + 10;
-
-  // --- Legal clause ---
-  const clause = "Para maior clareza, firmo o presente recibo para que produza os seus efeitos legais.";
-  const clauseLines = doc.splitTextToSize(clause, contentWidth);
-  doc.text(clauseLines, margin, y);
-  y += clauseLines.length * 6 + 20;
+  y += bodyLines.length * 6 + 20;
 
   // --- Date ---
   doc.text(formatReceiptDate(data.paymentDate), pageWidth / 2, y, { align: "center" });
