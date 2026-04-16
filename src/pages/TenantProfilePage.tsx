@@ -515,10 +515,11 @@ export default function TenantProfilePage() {
               );
             })}
           </div>
+          <p className="text-[10px] text-muted-foreground mt-3 text-center italic">
+            1 clique = pagar · 2 cliques = reverter para pendente · Atrasado abre janela de multa
+          </p>
         </CardContent>
       </Card>
-
-      {/* Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent>
           <DialogHeader>
