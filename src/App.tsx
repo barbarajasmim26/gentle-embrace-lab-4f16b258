@@ -49,6 +49,7 @@ function AuthenticatedApp() {
         <Route path="/receipt" element={<ReceiptPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
+        <Route path="/import-contract" element={<ContractImportPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
