@@ -24,6 +24,7 @@ export default function TenantsPage() {
   const [form, setForm] = useState({
     name: "", phone: "", house_number: "", rent_amount: "", deposit: "",
     payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "",
+    payment_cycle: "postecipado",
   });
 
   const now = new Date();
@@ -72,11 +73,11 @@ export default function TenantsPage() {
         rent_amount: parseFloat(form.rent_amount), deposit: form.deposit ? parseFloat(form.deposit) : null,
         payment_day: parseInt(form.payment_day) || 10, entry_date: form.entry_date || null,
         exit_date: form.exit_date || null, property_id: form.property_id || null, cpf: form.cpf || null,
-        notes: form.notes || null, status: "active",
+        notes: form.notes || null, status: "active", payment_cycle: form.payment_cycle,
       });
       toast.success("Inquilino criado!");
       setOpen(false);
-      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "" });
+      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "", payment_cycle: "postecipado" });
     } catch (e: any) { toast.error(e.message); }
   };
 
