@@ -535,10 +535,12 @@ export default function TenantProfilePage() {
               </div>
             </div>
 
-            <div>
-              <Label>Data do pagamento</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-            </div>
+            {payStatus !== "pending" && (
+              <div>
+                <Label>Data do pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+            )}
 
             {payStatus === "paid_late" && (
               <div className="space-y-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
@@ -562,10 +564,12 @@ export default function TenantProfilePage() {
               </div>
             )}
 
-            <div>
-              <Label>Valor pago (opcional, se diferente)</Label>
-              <Input type="number" step="0.01" placeholder={calcFinalAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
-            </div>
+            {payStatus !== "pending" && (
+              <div>
+                <Label>Valor pago (opcional, se diferente)</Label>
+                <Input type="number" step="0.01" placeholder={calcFinalAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
+              </div>
+            )}
 
             <Button className="w-full rounded-xl bg-success hover:bg-success/90 text-success-foreground" onClick={confirmPayment} disabled={upsertPayment.isPending}>
               {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
