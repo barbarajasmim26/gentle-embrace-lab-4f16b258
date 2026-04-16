@@ -6,11 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { openWhatsApp, buildWhatsAppUrl, getMessageTemplates } from "@/lib/whatsapp";
+import { openWhatsApp, buildWhatsAppUrl } from "@/lib/whatsapp";
+import { useMessageTemplates, fillTemplate, TEMPLATE_VARIABLES, type SavedTemplates } from "@/hooks/use-message-templates";
 import { toast } from "sonner";
-import { Send, MessageCircle, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Send, MessageCircle, ExternalLink, CheckCircle2, Save, RotateCcw, Edit3, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-type TemplateKey = "reminder" | "overdue" | "expiring" | "confirmation" | "welcome" | "custom";
+type TemplateKey = keyof SavedTemplates | "custom";
 
 const TEMPLATE_LABELS: Record<TemplateKey, string> = {
   reminder: "Lembrete de aluguel",
@@ -23,12 +25,15 @@ const TEMPLATE_LABELS: Record<TemplateKey, string> = {
 
 export default function WhatsAppPage() {
   const { data: tenants } = useTenants("active");
+  const { templates, updateTemplate, resetTemplate, defaults } = useMessageTemplates();
   const [template, setTemplate] = useState<TemplateKey>("reminder");
   const [customMessage, setCustomMessage] = useState("");
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [mode, setMode] = useState<"individual" | "mass">("individual");
   const [singleTenant, setSingleTenant] = useState("");
   const [sentTenants, setSentTenants] = useState<string[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
 
   const now = new Date();
 
@@ -36,13 +41,16 @@ export default function WhatsAppPage() {
     const t = tenants?.find((x) => x.id === tenantId);
     if (!t) return "";
     if (template === "custom") return customMessage;
-    const templates = getMessageTemplates({
-      name: t.name, amount: Number(t.rent_amount),
-      month: now.getMonth() + 1, year: now.getFullYear(),
-      property: t.property?.address || "", houseNumber: t.house_number || "",
+    const templateText = templates[template as keyof SavedTemplates];
+    return fillTemplate(templateText, {
+      name: t.name,
+      amount: Number(t.rent_amount),
+      month: now.getMonth() + 1,
+      year: now.getFullYear(),
+      property: t.property?.address || "",
+      houseNumber: t.house_number || "",
       dueDay: t.payment_day || 10,
     });
-    return templates[template as keyof typeof templates] || customMessage;
   };
 
   const handleSendIndividual = () => {
@@ -69,7 +77,7 @@ export default function WhatsAppPage() {
       return { id, name: t.name, phone: t.phone, message, url: buildWhatsAppUrl({ phone: t.phone, message }) };
     }).filter(Boolean) as { id: string; name: string; phone: string; message: string; url: string }[];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTenants, tenants, template, customMessage]);
+  }, [selectedTenants, tenants, template, customMessage, templates]);
 
   const toggleTenant = (id: string) => {
     setSelectedTenants((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -82,10 +90,35 @@ export default function WhatsAppPage() {
     setSentTenants([]);
   };
 
+  const startEditing = () => {
+    if (template !== "custom") {
+      setEditDraft(templates[template as keyof SavedTemplates]);
+      setEditingTemplate(true);
+    }
+  };
+
+  const saveEdit = () => {
+    if (template !== "custom") {
+      updateTemplate(template as keyof SavedTemplates, editDraft);
+      toast.success("Modelo salvo com sucesso!");
+    }
+    setEditingTemplate(false);
+  };
+
+  const handleReset = () => {
+    if (template !== "custom") {
+      resetTemplate(template as keyof SavedTemplates);
+      toast.success("Modelo restaurado ao padrão.");
+    }
+    setEditingTemplate(false);
+  };
+
+  const isModified = template !== "custom" && templates[template] !== defaults[template];
+
   const tenant = tenants?.find((t) => t.id === singleTenant);
   const previewMessage = mode === "individual" && tenant
     ? getMessageForTenant(singleTenant)
-    : customMessage;
+    : template === "custom" ? customMessage : templates[template];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -121,11 +154,56 @@ export default function WhatsAppPage() {
 
             <div>
               <Label>Modelo de Mensagem</Label>
-              <Select value={template} onValueChange={(v) => setTemplate(v as TemplateKey)}>
+              <Select value={template} onValueChange={(v) => { setTemplate(v as TemplateKey); setEditingTemplate(false); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(TEMPLATE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+
+            {/* Edit / Save / Reset buttons for saved templates */}
+            {template !== "custom" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {!editingTemplate ? (
+                  <Button variant="outline" size="sm" onClick={startEditing}>
+                    <Edit3 className="mr-1 h-3.5 w-3.5" />Editar modelo
+                  </Button>
+                ) : (
+                  <Button variant="default" size="sm" onClick={saveEdit}>
+                    <Save className="mr-1 h-3.5 w-3.5" />Salvar
+                  </Button>
+                )}
+                {isModified && (
+                  <Button variant="ghost" size="sm" onClick={handleReset}>
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" />Restaurar padrão
+                  </Button>
+                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Info className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="font-semibold mb-1">Variáveis disponíveis:</p>
+                      <ul className="text-xs space-y-0.5">
+                        {TEMPLATE_VARIABLES.map((v) => (
+                          <li key={v.tag}><code className="bg-muted px-1 rounded">{v.tag}</code> → {v.desc}</li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+
+            {/* Template editor */}
+            {editingTemplate && template !== "custom" && (
+              <div>
+                <Label>Editando: {TEMPLATE_LABELS[template]}</Label>
+                <Textarea value={editDraft} onChange={(e) => setEditDraft(e.target.value)} rows={8} className="font-mono text-xs" />
+              </div>
+            )}
 
             {template === "custom" && (
               <div>
@@ -171,11 +249,7 @@ export default function WhatsAppPage() {
                           <span className="text-sm font-medium truncate">{link.name}</span>
                           <span className="text-xs text-muted-foreground">{link.phone}</span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isSent ? "outline" : "default"}
-                          onClick={() => handleSendOne(link.id)}
-                        >
+                        <Button size="sm" variant={isSent ? "outline" : "default"} onClick={() => handleSendOne(link.id)}>
                           <ExternalLink className="mr-1 h-3 w-3" />
                           {isSent ? "Reenviar" : "Enviar"}
                         </Button>
