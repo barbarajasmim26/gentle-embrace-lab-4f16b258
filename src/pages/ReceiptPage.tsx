@@ -25,7 +25,7 @@ export default function ReceiptPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [emissionDate, setEmissionDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentMethod, setPaymentMethod] = useState("Pix");
-  const [signatureName, setSignatureName] = useState("LOCADOR");
+  const [signatureName, setSignatureName] = useState("Maria Eneide da Silva - LOCADORA");
 
   const filteredTenants = useMemo(() => {
     if (!tenants) return [];
