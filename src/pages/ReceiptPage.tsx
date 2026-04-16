@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, type ReceiptData } from "@/lib/receipt-generator";
+import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, buildReceiptBody, type ReceiptData } from "@/lib/receipt-generator";
 import { toast } from "sonner";
 import { Download, Printer, Receipt } from "lucide-react";
 import logoSrc from "@/assets/logo-mesquita.png";
@@ -192,34 +192,33 @@ export default function ReceiptPage() {
           >
             {previewData ? (
               <>
-                {/* Logo */}
-                <div style={{ textAlign: "center", marginBottom: "30px" }}>
-                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "200px", height: "auto", margin: "0 auto" }} />
+                {/* Logo - left aligned like original */}
+                <div style={{ textAlign: "left", marginBottom: "35px" }}>
+                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto" }} />
                 </div>
 
                 {/* Title */}
-                <h2 style={{ textAlign: "center", fontSize: "16px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "30px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
+                <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
                   RECIBO DE PAGAMENTO
                 </h2>
 
-                {/* Body */}
-                <div style={{ textAlign: "justify", marginBottom: "30px", lineHeight: "2" }}>
+                {/* Body - centered like original */}
+                <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
                   <p>
-                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° <strong>{formatCPF(tenant?.cpf)}</strong>, o valor de <strong>R$ {amount.toFixed(2)}</strong> ({amountInWords(amount)}) via <strong>{paymentMethod.toLowerCase()}</strong>{paidBy && paidBy !== tenant?.name ? <> por <strong>{paidBy.toUpperCase()}</strong></> : null}, valor este referente ao {paymentType} do mês de <strong>{monthName || "__________"} de {year || "______"}</strong>, do imóvel localizado <strong>{fullAddress} - Cascavel - CE</strong>.
+                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy && paidBy !== tenant?.name ? <> por <strong>{paidBy.toUpperCase()}</strong></> : null}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE
                   </p>
                 </div>
 
                 {/* Date */}
-                <div style={{ textAlign: "center", margin: "40px 0 50px" }}>
+                <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
                   <p>{formatReceiptDate(emissionDate)}</p>
                 </div>
 
                 {/* Signature */}
                 <div style={{ textAlign: "center", marginTop: "20px" }}>
                   <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "180px", height: "auto", margin: "0 auto 5px" }} />
-                  <div style={{ width: "250px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
-                    <p style={{ fontWeight: "bold", margin: 0 }}>{signatureName}</p>
-                    <p style={{ margin: 0, fontSize: "12px" }}>LOCADORA</p>
+                  <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
+                    <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
                   </div>
                 </div>
               </>
