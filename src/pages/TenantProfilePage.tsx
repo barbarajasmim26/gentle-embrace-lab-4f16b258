@@ -49,7 +49,7 @@ export default function TenantProfilePage() {
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payMonth, setPayMonth] = useState(0);
   const [payStatus, setPayStatus] = useState<PaymentStatusType>("paid");
-  const [payLateFee, setPayLateFee] = useState("2");
+  const [payLateFee, setPayLateFee] = useState("10");
   const [payInterest, setPayInterest] = useState("1");
   const [payCustomAmount, setPayCustomAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
@@ -123,7 +123,7 @@ export default function TenantProfilePage() {
     if (isOverdue) {
       setPayMonth(m);
       setPayStatus("paid_late");
-      setPayLateFee("2");
+      setPayLateFee("10");
       setPayInterest("1");
       setPayCustomAmount("");
       setPayDate(new Date().toISOString().split("T")[0]);
@@ -250,7 +250,7 @@ export default function TenantProfilePage() {
       month, year: currentYear,
       property: tenant.property?.address || "", houseNumber: tenant.house_number || "",
       dueDay: tenant.payment_day || 10,
-      lateFee: 2, interest: 1, totalWithFees: total,
+      lateFee: 10, interest: 1, totalWithFees: total,
     });
     openWhatsApp({ phone: tenant.phone, message: templates.overdue });
   };
@@ -621,7 +621,7 @@ export default function TenantProfilePage() {
                   setDetailOpen(false);
                   setPayMonth(detailMonth);
                   setPayStatus(detailPayment?.status === "paid_late" ? "paid_late" : "paid");
-                  setPayLateFee(String(detailPayment?.late_fee_percent ?? 2));
+                  setPayLateFee(String(detailPayment?.late_fee_percent ?? 10));
                   setPayInterest(String(detailPayment?.interest_percent ?? 1));
                   setPayCustomAmount("");
                   setPayDate(detailPayment?.paid_at || new Date().toISOString().split("T")[0]);

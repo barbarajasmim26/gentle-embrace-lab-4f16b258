@@ -24,7 +24,7 @@ export default function OverduePage() {
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payTenant, setPayTenant] = useState<any>(null);
   const [payStatus, setPayStatus] = useState<"paid" | "paid_late">("paid_late");
-  const [payLateFee, setPayLateFee] = useState("2");
+  const [payLateFee, setPayLateFee] = useState("10");
   const [payInterest, setPayInterest] = useState("1");
   const [payCustomAmount, setPayCustomAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
@@ -52,7 +52,7 @@ export default function OverduePage() {
     return (t.payment_day || 10) < now.getDate();
   }) || [];
 
-  const calcFees = (amount: number, lateFee = 2, interest = 1) => {
+  const calcFees = (amount: number, lateFee = 10, interest = 1) => {
     const fee = amount * (lateFee / 100);
     const int = amount * (interest / 100);
     return { fee, interest: int, total: amount + fee + int };
@@ -64,7 +64,7 @@ export default function OverduePage() {
     const templates = getMessageTemplates({
       name: t.name, amount: Number(t.rent_amount), month, year,
       property: t.property?.address || "", houseNumber: t.house_number || "",
-      dueDay: t.payment_day || 10, lateFee: 2, interest: 1, totalWithFees: total,
+      dueDay: t.payment_day || 10, lateFee: 10, interest: 1, totalWithFees: total,
     });
     openWhatsApp({ phone: t.phone, message: templates.overdue });
   };
@@ -77,7 +77,7 @@ export default function OverduePage() {
   const openPayDialog = (t: any) => {
     setPayTenant(t);
     setPayStatus("paid_late");
-    setPayLateFee("2");
+    setPayLateFee("10");
     setPayInterest("1");
     setPayCustomAmount("");
     setPayDate(new Date().toISOString().split("T")[0]);

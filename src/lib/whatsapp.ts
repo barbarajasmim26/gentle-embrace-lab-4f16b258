@@ -54,7 +54,7 @@ export function getMessageTemplates(data: MessageTemplateData) {
   return {
     reminder: `Olá ${data.name}! 😊\n\nLembramos que o aluguel de ${monthName}/${data.year} no valor de R$ ${data.amount.toFixed(2)} vence dia ${data.dueDay}.\n\nImóvel: ${data.property}${data.houseNumber ? `, Casa ${data.houseNumber}` : ""}\n\nQualquer dúvida, estamos à disposição!`,
 
-    overdue: `Olá ${data.name},\n\nIdentificamos que o aluguel de ${monthName}/${data.year} está em atraso.\n\nValor original: R$ ${data.amount.toFixed(2)}\nMulta: ${data.lateFee || 2}%\nJuros: ${data.interest || 1}%\nTotal atualizado: R$ ${(data.totalWithFees || data.amount).toFixed(2)}\n\nImóvel: ${data.property}${data.houseNumber ? `, Casa ${data.houseNumber}` : ""}\n\nPor favor, regularize o quanto antes. Estamos à disposição!`,
+    overdue: `Olá ${data.name},\n\nIdentificamos que o aluguel de ${monthName}/${data.year} está em atraso.\n\nValor original: R$ ${data.amount.toFixed(2)}\nMulta: ${data.lateFee || 10}%\nJuros: ${data.interest || 1}%\nTotal atualizado: R$ ${(data.totalWithFees || data.amount).toFixed(2)}\n\nImóvel: ${data.property}${data.houseNumber ? `, Casa ${data.houseNumber}` : ""}\n\nPor favor, regularize o quanto antes. Estamos à disposição!`,
 
     expiring: `Olá ${data.name}!\n\nInformamos que seu contrato de aluguel está próximo do vencimento.\n\nImóvel: ${data.property}${data.houseNumber ? `, Casa ${data.houseNumber}` : ""}\n\nEntre em contato para renovação. Obrigado!`,
 

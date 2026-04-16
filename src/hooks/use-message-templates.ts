@@ -81,7 +81,7 @@ export function fillTemplate(tpl: string, data: FillData): string {
     .replace(/\{endereco\}/g, data.property)
     .replace(/\{casa\}/g, data.houseNumber ? `, Casa ${data.houseNumber}` : "")
     .replace(/\{vencimento\}/g, String(data.dueDay || 10))
-    .replace(/\{multa\}/g, String(data.lateFee || 2))
+    .replace(/\{multa\}/g, String(data.lateFee || 10))
     .replace(/\{juros\}/g, String(data.interest || 1))
     .replace(/\{total\}/g, (data.totalWithFees || data.amount).toFixed(2));
 }
