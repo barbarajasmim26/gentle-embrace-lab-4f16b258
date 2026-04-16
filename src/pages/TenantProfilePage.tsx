@@ -112,8 +112,6 @@ export default function TenantProfilePage() {
     return base + base * (feePercent / 100) + base * (intPercent / 100);
   };
 
-  // Use the ref declared before early returns
-
   const handlePaymentClick = useCallback((m: number) => {
     const existing = getPayment(m);
     const status = existing?.status || "pending";
