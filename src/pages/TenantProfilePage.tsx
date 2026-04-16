@@ -620,7 +620,16 @@ export default function TenantProfilePage() {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => { setDetailOpen(false); openPayDialog(detailMonth); }}>
+                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => {
+                  setDetailOpen(false);
+                  setPayMonth(detailMonth);
+                  setPayStatus(detailPayment?.status === "paid_late" ? "paid_late" : "paid");
+                  setPayLateFee(String(detailPayment?.late_fee_percent ?? 2));
+                  setPayInterest(String(detailPayment?.interest_percent ?? 1));
+                  setPayCustomAmount("");
+                  setPayDate(detailPayment?.paid_at || new Date().toISOString().split("T")[0]);
+                  setPayDialogOpen(true);
+                }}>
                   <Edit className="mr-1 h-3 w-3" />Editar pagamento
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg" onClick={() => handleReceipt(detailMonth)}>
