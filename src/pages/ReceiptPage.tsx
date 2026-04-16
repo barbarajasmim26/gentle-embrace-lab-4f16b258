@@ -190,43 +190,36 @@ export default function ReceiptPage() {
               lineHeight: "1.8",
             }}
           >
-            {previewData ? (
-              <>
-                {/* Logo - left aligned like original */}
-                <div style={{ textAlign: "center", marginBottom: "35px" }}>
-                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto", margin: "0 auto" }} />
-                </div>
+            {/* Logo */}
+            <div style={{ textAlign: "center", marginBottom: "35px" }}>
+              <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto", margin: "0 auto" }} />
+            </div>
 
-                {/* Title */}
-                <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
-                  RECIBO DE PAGAMENTO
-                </h2>
+            {/* Title */}
+            <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
+              RECIBO DE PAGAMENTO
+            </h2>
 
-                {/* Body - centered like original */}
-                <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
-                  <p>
-                    Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy && paidBy !== tenant?.name ? <> por <strong>{paidBy.toUpperCase()}</strong></> : null}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE
-                  </p>
-                </div>
+            {/* Body */}
+            <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
+              <p>
+                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, inscrito no CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong>, referente ao pagamento de {paymentType} do mês de {monthName || "__________"}, do imóvel situado em {fullAddress || "____________________________"}.
+              </p>
+            </div>
 
-                {/* Date */}
-                <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
-                  <p>{formatReceiptDate(emissionDate)}</p>
-                </div>
+            {/* Date */}
+            <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
+              <p>{formatReceiptDate(emissionDate)}</p>
+            </div>
 
-                {/* Signature */}
-                <div style={{ textAlign: "center", marginTop: "20px" }}>
-                  <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
-                  <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
-                    <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ textAlign: "center", color: "#999", paddingTop: "200px" }}>
-                <p>Selecione um inquilino para visualizar o recibo.</p>
+            {/* Signature */}
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
+              <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
+              <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
+                <p style={{ margin: 0 }}>{signatureName}</p>
+                <p style={{ margin: 0, fontSize: "11px", letterSpacing: "1px" }}>LOCADORA</p>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
