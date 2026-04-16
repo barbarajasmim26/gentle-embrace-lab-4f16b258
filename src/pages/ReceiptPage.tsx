@@ -217,7 +217,7 @@ export default function ReceiptPage() {
             {/* Body - always shown with placeholders */}
             <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
               <p>
-                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, inscrito no CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong>, referente ao pagamento de {paymentType} do mês de {monthName || "__________"}, do imóvel situado em {fullAddress}.
+                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy ? ` por ${paidBy.toUpperCase()}` : ""}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE.
               </p>
             </div>
 
