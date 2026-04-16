@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, useProperties, useAllPayments } from "@/hooks/use-tenants";
 import { useDocuments } from "@/hooks/use-documents";
