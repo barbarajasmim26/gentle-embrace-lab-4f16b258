@@ -119,7 +119,7 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
     const logoImg = await loadImage(logoSrc);
     const logoWidth = 70;
     const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-    doc.addImage(logoImg, "PNG", margin, y, logoWidth, logoHeight);
+    doc.addImage(logoImg, "PNG", (pageWidth - logoWidth) / 2, y, logoWidth, logoHeight);
     y += logoHeight + 22;
   } catch {
     y += 30;
@@ -152,7 +152,7 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   // --- Signature image ---
   try {
     const signatureImg = await loadImage(signatureSrc);
-    const sigWidth = 55;
+    const sigWidth = 70;
     const sigHeight = (signatureImg.height / signatureImg.width) * sigWidth;
     doc.addImage(signatureImg, "PNG", (pageWidth - sigWidth) / 2, y, sigWidth, sigHeight);
     y += sigHeight + 2;

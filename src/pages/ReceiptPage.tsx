@@ -193,8 +193,8 @@ export default function ReceiptPage() {
             {previewData ? (
               <>
                 {/* Logo - left aligned like original */}
-                <div style={{ textAlign: "left", marginBottom: "35px" }}>
-                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto" }} />
+                <div style={{ textAlign: "center", marginBottom: "35px" }}>
+                  <img src={logoSrc} alt="Logo" style={{ maxWidth: "220px", height: "auto", margin: "0 auto" }} />
                 </div>
 
                 {/* Title */}
@@ -216,7 +216,7 @@ export default function ReceiptPage() {
 
                 {/* Signature */}
                 <div style={{ textAlign: "center", marginTop: "20px" }}>
-                  <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "180px", height: "auto", margin: "0 auto 5px" }} />
+                  <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
                   <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
                     <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
                   </div>
