@@ -128,7 +128,8 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   doc.setFontSize(11);
 
   const formattedCPF = formatCPF(data.cpf);
-  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a), CPF n° ${formattedCPF}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
+  const paidByText = data.paidBy && data.paidBy !== data.tenantName ? ` por ${data.paidBy.toUpperCase()}` : "";
+  const bodyText = `Recebi de ${data.tenantName.toUpperCase()}, brasileiro(a), CPF n° ${formattedCPF}, o valor de R$ ${data.amount.toFixed(2)} (${amountInWords(data.amount)}) via ${data.paymentMethod.toLowerCase()}${paidByText}, valor este referente ao ${paymentType} do mês de ${monthName} de ${data.year}, do imóvel localizado ${address} - Cascavel - CE.`;
 
   const bodyLines = doc.splitTextToSize(bodyText, contentWidth);
   doc.text(bodyLines, margin, y);
