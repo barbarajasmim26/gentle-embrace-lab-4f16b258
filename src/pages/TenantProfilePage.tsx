@@ -229,6 +229,7 @@ export default function TenantProfilePage() {
 
   const handleReceipt = async (m: number) => {
     const payment = getPayment(m);
+    const isDeposit = payment?.status === "deposit";
     const doc = await generateReceipt({
       tenantName: tenant.name,
       cpf: tenant.cpf || undefined,
@@ -238,11 +239,12 @@ export default function TenantProfilePage() {
       month: m, year,
       paymentDate: payment?.paid_at || new Date().toISOString().split("T")[0],
       paymentMethod: "Pix",
+      paymentType: isDeposit ? "caução" : "aluguel",
       receiptNumber: `REC-${year}-${String(m).padStart(2, "0")}-${tenant.id.slice(0, 6).toUpperCase()}`,
       signatureName: "LOCADOR",
     });
-    doc.save(`recibo_${tenant.name}_${m}_${year}.pdf`);
-    toast.success("Recibo gerado!");
+    doc.save(`recibo_${tenant.name}_${isDeposit ? "caucao" : m}_${year}.pdf`);
+    toast.success(`Recibo de ${isDeposit ? "caução" : "pagamento"} gerado!`);
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
