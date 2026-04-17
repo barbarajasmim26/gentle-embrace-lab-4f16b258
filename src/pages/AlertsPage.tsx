@@ -22,9 +22,8 @@ export default function AlertsPage() {
   const [renewTenant, setRenewTenant] = useState<any>(null);
   const [renewForm, setRenewForm] = useState({ entry_date: "", exit_date: "" });
 
-  const allTenants = [...(activeTenants || []), ...(formerTenants || [])];
-
-  const expiredContracts = allTenants.filter((t) => t.exit_date && parseISO(t.exit_date) < today && !isToday(parseISO(t.exit_date)));
+  // Apenas inquilinos ATIVOS devem aparecer em alertas (ex-inquilinos não)
+  const expiredContracts = (activeTenants || []).filter((t) => t.exit_date && parseISO(t.exit_date) < today && !isToday(parseISO(t.exit_date)));
   const expiringSoon = (activeTenants || []).filter((t) => {
     if (!t.exit_date) return false;
     const d = differenceInDays(parseISO(t.exit_date), today);
@@ -54,11 +53,16 @@ export default function AlertsPage() {
 
   const handleNotRenew = async (tenant: any, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm(`Não renovar contrato de ${tenant.name}?`)) return;
+    e?.preventDefault();
+    const ok = window.confirm(`Não renovar contrato de ${tenant.name}? Ele será movido para ex-inquilinos.`);
+    if (!ok) return;
     try {
       await updateTenant.mutateAsync({ id: tenant.id, status: "former" });
       toast.success(`${tenant.name} movido para ex-inquilinos.`);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (err: any) {
+      console.error("Erro ao não renovar:", err);
+      toast.error(err.message || "Erro ao mover inquilino");
+    }
   };
 
   return (
