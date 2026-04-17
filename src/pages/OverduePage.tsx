@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTenants, useAllPayments, useUpsertPayment } from "@/hooks/use-tenants";
+import { useAppSettings, resolveFees } from "@/hooks/use-settings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ export default function OverduePage() {
   const { data: tenants } = useTenants("active");
   const { data: allPayments } = useAllPayments(year);
   const upsertPayment = useUpsertPayment();
+  const { data: settings } = useAppSettings();
   const navigate = useNavigate();
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -37,6 +39,7 @@ export default function OverduePage() {
   }) || [];
 
   const getFees = (t: any, date: Date = now) => {
+    const { lateFee, interest } = resolveFees(t, settings);
     return calculateTenantFees(
       Number(t.rent_amount),
       month,
@@ -44,8 +47,8 @@ export default function OverduePage() {
       t.payment_day || 10,
       t.payment_cycle || "postecipado",
       date,
-      Number(payLateFee || 10),
-      Number(payInterest || 1)
+      lateFee,
+      interest,
     );
   };
 
@@ -73,10 +76,11 @@ export default function OverduePage() {
   };
 
   const openPayDialog = (t: any) => {
+    const { lateFee, interest } = resolveFees(t, settings);
     setPayTenant(t);
     setPayStatus("paid_late");
-    setPayLateFee("10");
-    setPayInterest("1");
+    setPayLateFee(String(lateFee));
+    setPayInterest(String(interest));
     setPayCustomAmount("");
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayDialogOpen(true);

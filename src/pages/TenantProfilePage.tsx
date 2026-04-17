@@ -18,6 +18,7 @@ import { isAbsoluteHttpUrl, parseStorageReference } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
 import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
+import { useAppSettings, resolveFees } from "@/hooks/use-settings";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -46,6 +47,7 @@ export default function TenantProfilePage() {
   const { data: allPayments } = useAllPayments(currentYear);
   const updateTenant = useUpdateTenant();
   const upsertPayment = useUpsertPayment();
+  const { data: settings } = useAppSettings();
   
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -134,10 +136,11 @@ export default function TenantProfilePage() {
   const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
     const currentStatus = existing?.status || "pending";
+    const { lateFee, interest } = resolveFees(tenant, settings);
     setPayMonth(m);
     setPayStatus(currentStatus === "pending" ? "paid" : currentStatus as PaymentStatusType);
-    setPayLateFee("10");
-    setPayInterest("1");
+    setPayLateFee(String(existing?.late_fee_percent ?? lateFee));
+    setPayInterest(String(existing?.interest_percent ?? interest));
     setPayCustomAmount("");
     setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
     setPayDialogOpen(true);
@@ -173,6 +176,8 @@ export default function TenantProfilePage() {
       property_id: tenant.property_id || "", notes: tenant.notes || "",
       payment_cycle: tenant.payment_cycle || "postecipado",
       status: tenant.status || "active",
+      default_late_fee_percent: tenant.default_late_fee_percent ?? "",
+      default_interest_percent: tenant.default_interest_percent ?? "",
     });
     setEditOpen(true);
   };
@@ -189,6 +194,8 @@ export default function TenantProfilePage() {
         notes: editForm.notes || null,
         payment_cycle: editForm.payment_cycle || "postecipado",
         status: editForm.status || "active",
+        default_late_fee_percent: editForm.default_late_fee_percent === "" || editForm.default_late_fee_percent == null ? null : Number(editForm.default_late_fee_percent),
+        default_interest_percent: editForm.default_interest_percent === "" || editForm.default_interest_percent == null ? null : Number(editForm.default_interest_percent),
       });
       toast.success("Salvo!");
       setEditOpen(false);
@@ -802,6 +809,19 @@ export default function TenantProfilePage() {
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Entrada</Label><Input type="date" value={editForm.entry_date || ""} onChange={(e) => setEditForm({ ...editForm, entry_date: e.target.value })} /></div>
               <div><Label>Saída</Label><Input type="date" value={editForm.exit_date || ""} onChange={(e) => setEditForm({ ...editForm, exit_date: e.target.value })} /></div>
+            </div>
+            <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground">Multa e Juros (deixe vazio para usar o padrão global)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Multa (%)</Label>
+                  <Input type="number" step="0.1" placeholder={`Padrão: ${settings?.default_late_fee_percent ?? 10}`} value={editForm.default_late_fee_percent ?? ""} onChange={(e) => setEditForm({ ...editForm, default_late_fee_percent: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Juros mensal (%)</Label>
+                  <Input type="number" step="0.1" placeholder={`Padrão: ${settings?.default_interest_percent ?? 1}`} value={editForm.default_interest_percent ?? ""} onChange={(e) => setEditForm({ ...editForm, default_interest_percent: e.target.value })} />
+                </div>
+              </div>
             </div>
             <div><Label>Observações</Label><Textarea value={editForm.notes || ""} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Anotações importantes..." rows={3} /></div>
             <Button className="w-full rounded-xl" onClick={saveEdit} disabled={updateTenant.isPending}>Salvar</Button>

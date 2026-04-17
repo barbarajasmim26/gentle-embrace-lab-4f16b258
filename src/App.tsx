@@ -18,6 +18,7 @@ import ReceiptPage from "./pages/ReceiptPage";
 import SearchPage from "./pages/SearchPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import ContractImportPage from "./pages/ContractImportPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ function AuthenticatedApp() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
         <Route path="/import-contract" element={<ContractImportPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>

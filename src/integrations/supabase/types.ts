@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          default_interest_percent: number
+          default_late_fee_percent: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_interest_percent?: number
+          default_late_fee_percent?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_interest_percent?: number
+          default_late_fee_percent?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           category: string | null
@@ -130,6 +154,8 @@ export type Database = {
         Row: {
           cpf: string | null
           created_at: string
+          default_interest_percent: number | null
+          default_late_fee_percent: number | null
           deposit: number | null
           entry_date: string | null
           exit_date: string | null
@@ -148,6 +174,8 @@ export type Database = {
         Insert: {
           cpf?: string | null
           created_at?: string
+          default_interest_percent?: number | null
+          default_late_fee_percent?: number | null
           deposit?: number | null
           entry_date?: string | null
           exit_date?: string | null
@@ -166,6 +194,8 @@ export type Database = {
         Update: {
           cpf?: string | null
           created_at?: string
+          default_interest_percent?: number | null
+          default_late_fee_percent?: number | null
           deposit?: number | null
           entry_date?: string | null
           exit_date?: string | null
