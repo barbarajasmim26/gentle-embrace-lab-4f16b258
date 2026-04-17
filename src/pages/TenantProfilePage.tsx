@@ -16,6 +16,7 @@ import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whats
 import { generateReceipt } from "@/lib/receipt-generator";
 import { extractSupabaseStoragePath, isAbsoluteHttpUrl } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
+import { isOverdue, PAYMENT_CYCLE_LABELS } from "@/lib/payment-status";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -24,7 +25,8 @@ type PaymentStatusType = "paid" | "paid_late" | "pending" | "deposit";
 const STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: any }> = {
   paid: { label: "Em dia", colorClass: "bg-success/10 text-success border-success/30", icon: CheckCircle2 },
   paid_late: { label: "Atrasado", colorClass: "bg-warning/10 text-warning border-warning/30", icon: Clock },
-  pending: { label: "Pend.", colorClass: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
+  pending: { label: "Pend.", colorClass: "bg-muted text-muted-foreground border-border", icon: Clock },
+  overdue: { label: "Atrasado", colorClass: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
   deposit: { label: "Caução", colorClass: "bg-primary/10 text-primary border-primary/30", icon: DollarSign },
 };
 
@@ -101,7 +103,13 @@ export default function TenantProfilePage() {
   const pattern = getPaymentPattern();
 
   const getPayment = (m: number) => payments?.find((p) => p.month === m);
-  const getPaymentStatus = (m: number) => getPayment(m)?.status || "pending";
+  const getPaymentStatus = (m: number) => {
+    const p = getPayment(m);
+    if (p) return p.status;
+    if (year !== currentYear) return "pending";
+    if (isOverdue(m, year, tenant.payment_day || 10, tenant.payment_cycle, now)) return "overdue";
+    return "pending";
+  };
 
   // Calculate late fee amount
   const calcFinalAmount = () => {
@@ -154,6 +162,7 @@ export default function TenantProfilePage() {
       rent_amount: tenant.rent_amount, deposit: tenant.deposit || "", payment_day: tenant.payment_day || 10,
       entry_date: tenant.entry_date || "", exit_date: tenant.exit_date || "", cpf: tenant.cpf || "",
       property_id: tenant.property_id || "", notes: tenant.notes || "",
+      payment_cycle: tenant.payment_cycle || "postecipado",
     });
     setEditOpen(true);
   };
@@ -168,6 +177,7 @@ export default function TenantProfilePage() {
         entry_date: editForm.entry_date || null, exit_date: editForm.exit_date || null,
         cpf: editForm.cpf || null, property_id: editForm.property_id || null,
         notes: editForm.notes || null,
+        payment_cycle: editForm.payment_cycle || "postecipado",
       });
       toast.success("Salvo!");
       setEditOpen(false);
@@ -358,6 +368,7 @@ export default function TenantProfilePage() {
           { icon: DollarSign, label: "Aluguel", value: `R$ ${rentAmount.toFixed(2)}`, colorClass: "text-success" },
           { icon: DollarSign, label: "Caução", value: `R$ ${Number(tenant.deposit || 0).toFixed(2)}`, colorClass: "text-primary" },
           { icon: Calendar, label: "Vencimento", value: `Dia ${tenant.payment_day}`, colorClass: "text-primary" },
+          { icon: Clock, label: "Ciclo", value: tenant.payment_cycle === "antecipado" ? "Paga e mora" : "Mora e paga", colorClass: "text-accent" },
           { icon: Calendar, label: "Entrada", value: tenant.entry_date ? new Date(tenant.entry_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
           { icon: Calendar, label: "Saída", value: tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
           { icon: User, label: "CPF", value: tenant.cpf || "—", colorClass: "text-muted-foreground" },
@@ -647,7 +658,19 @@ export default function TenantProfilePage() {
               <div><Label>Aluguel</Label><Input type="number" value={editForm.rent_amount || ""} onChange={(e) => setEditForm({ ...editForm, rent_amount: e.target.value })} /></div>
               <div><Label>Caução</Label><Input type="number" value={editForm.deposit || ""} onChange={(e) => setEditForm({ ...editForm, deposit: e.target.value })} /></div>
             </div>
-            <div><Label>Dia Pagamento</Label><Input type="number" value={editForm.payment_day || ""} onChange={(e) => setEditForm({ ...editForm, payment_day: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Dia Pagamento</Label><Input type="number" value={editForm.payment_day || ""} onChange={(e) => setEditForm({ ...editForm, payment_day: e.target.value })} /></div>
+              <div>
+                <Label>Ciclo de Pagamento</Label>
+                <Select value={editForm.payment_cycle || "postecipado"} onValueChange={(v) => setEditForm({ ...editForm, payment_cycle: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="antecipado">Paga e mora (antecipado)</SelectItem>
+                    <SelectItem value="postecipado">Mora e paga (postecipado)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Entrada</Label><Input type="date" value={editForm.entry_date || ""} onChange={(e) => setEditForm({ ...editForm, entry_date: e.target.value })} /></div>
               <div><Label>Saída</Label><Input type="date" value={editForm.exit_date || ""} onChange={(e) => setEditForm({ ...editForm, exit_date: e.target.value })} /></div>

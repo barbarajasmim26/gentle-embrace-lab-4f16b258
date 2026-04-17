@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
+import { isOverdue } from "@/lib/payment-status";
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -22,7 +23,7 @@ export default function DashboardPage() {
   const overdue = tenants?.filter((t) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
     if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
-    return (t.payment_day || 10) < now.getDate();
+    return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
   }) || [];
 
   // Conta alertas reais (vencidos + vencendo em 30 dias) — mesma lógica da página de Alertas
