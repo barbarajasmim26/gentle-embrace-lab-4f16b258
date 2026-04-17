@@ -21,10 +21,12 @@ export function getDueDate(
   cycle: PaymentCycle = "postecipado",
 ): Date {
   const isAnticipated = cycle === "antecipado";
-  const dueMonth = isAnticipated ? refMonth - 1 : refMonth; // 0-indexed JS: jan=0, fev=1...
-  const dueYear = refYear;
-  // Date com mês overflow se ajusta automaticamente (ex: dia 31 em fev)
-  return new Date(dueYear, dueMonth, paymentDay);
+  // refMonth é 1..12. Date espera mês 0-indexed.
+  // - antecipado (paga e mora): vence dia X do PRÓPRIO mês de referência → mês JS = refMonth - 1
+  // - postecipado (mora e paga): vence dia X do mês SEGUINTE → mês JS = refMonth (que equivale a refMonth+1 0-indexed)
+  const dueMonthJs = isAnticipated ? refMonth - 1 : refMonth;
+  // Date com overflow se ajusta automaticamente (ex: mês 12 vira jan do ano seguinte)
+  return new Date(refYear, dueMonthJs, paymentDay);
 }
 
 /**
