@@ -10,6 +10,7 @@ import { AlertTriangle, MessageCircle, Eye, CheckCircle2, Clock, DollarSign, Hom
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
+import { isOverdue } from "@/lib/payment-status";
 
 export default function OverduePage() {
   const now = new Date();
@@ -31,7 +32,7 @@ export default function OverduePage() {
   const overdue = tenants?.filter((t) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
     if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
-    return (t.payment_day || 10) < now.getDate();
+    return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
   }) || [];
 
   const calcFees = (amount: number, lateFee = 10, interest = 1) => {
