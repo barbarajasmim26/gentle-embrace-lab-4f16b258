@@ -283,27 +283,46 @@ export default function TenantProfilePage() {
         window.open(fileUrl, "_blank", "noopener,noreferrer");
         return;
       }
-
       toast.error("Documento inválido.");
       return;
     }
 
-    const tryOpen = async (bucket: string, path: string) => {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-      if (error || !data?.signedUrl) return null;
-      return data.signedUrl;
+    // Baixa o arquivo via SDK (não passa pelo bloqueador) e abre como blob: local
+    const tryDownload = async (bucket: string, path: string) => {
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+      if (error || !data) return null;
+      return data;
     };
 
-    const signedUrl =
-      (await tryOpen(storageRef.bucket, storageRef.path)) ||
-      (storageRef.bucket !== "contracts" ? await tryOpen("contracts", storageRef.path) : null);
+    try {
+      const blob =
+        (await tryDownload(storageRef.bucket, storageRef.path)) ||
+        (storageRef.bucket !== "contracts" ? await tryDownload("contracts", storageRef.path) : null);
 
-    if (!signedUrl) {
-      toast.error("Não foi possível abrir o documento.");
-      return;
+      if (!blob) {
+        toast.error("Não foi possível abrir o documento.");
+        return;
+      }
+
+      // Garante MIME correto para inline preview no navegador
+      const typedBlob = blob.type ? blob : new Blob([blob], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(typedBlob);
+      const win = window.open(blobUrl, "_blank", "noopener,noreferrer");
+      if (!win) {
+        // Pop-up bloqueado: força download
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = storageRef.path.split("/").pop() || "documento.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        toast.info("Pop-up bloqueado — documento baixado.");
+      }
+      // Libera o blob após alguns minutos
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5 * 60 * 1000);
+    } catch (e: any) {
+      toast.error("Erro ao abrir documento: " + (e?.message || "tente novamente"));
     }
-
-    window.open(signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const detailPayment = getPayment(detailMonth);
