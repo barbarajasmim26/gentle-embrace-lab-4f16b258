@@ -14,7 +14,7 @@ import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, Exter
 import { toast } from "sonner";
 import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whatsapp";
 import { generateReceipt } from "@/lib/receipt-generator";
-import { extractSupabaseStoragePath, isAbsoluteHttpUrl } from "@/lib/document-url";
+import { isAbsoluteHttpUrl, parseStorageReference } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
 import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
@@ -275,17 +275,35 @@ export default function TenantProfilePage() {
     }
   };
 
-  const openDocument = async (path: string) => {
-    if (isAbsoluteHttpUrl(path)) {
-      window.open(path, "_blank", "noopener,noreferrer");
+  const openDocument = async (fileUrl: string) => {
+    const storageRef = parseStorageReference(fileUrl);
+
+    if (!storageRef) {
+      if (isAbsoluteHttpUrl(fileUrl)) {
+        window.open(fileUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      toast.error("Documento inválido.");
       return;
     }
-    const { data, error } = await supabase.storage.from("contracts").createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) {
+
+    const tryOpen = async (bucket: string, path: string) => {
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) return null;
+      return data.signedUrl;
+    };
+
+    const signedUrl =
+      (await tryOpen(storageRef.bucket, storageRef.path)) ||
+      (storageRef.bucket !== "contracts" ? await tryOpen("contracts", storageRef.path) : null);
+
+    if (!signedUrl) {
       toast.error("Não foi possível abrir o documento.");
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const detailPayment = getPayment(detailMonth);

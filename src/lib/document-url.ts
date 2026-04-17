@@ -6,25 +6,35 @@ function safeDecode(value: string) {
   }
 }
 
-export function extractSupabaseStoragePath(fileUrl: string) {
+export function parseStorageReference(fileUrl: string) {
   const trimmed = fileUrl.trim();
 
-  if (!trimmed) return "";
+  if (!trimmed) return null;
 
   if (!/^https?:\/\//i.test(trimmed)) {
-    return safeDecode(trimmed.replace(/^\/+/, ""));
+    return {
+      bucket: "contracts",
+      path: safeDecode(trimmed.replace(/^\/+/, "")),
+    };
   }
 
   try {
     const url = new URL(trimmed);
-    const match = url.pathname.match(/\/storage\/v1\/object\/(?:sign|public)\/contracts\/(.+)$/i);
+    const match = url.pathname.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/i);
 
-    if (!match?.[1]) return "";
+    if (!match?.[1] || !match?.[2]) return null;
 
-    return safeDecode(match[1]);
+    return {
+      bucket: safeDecode(match[1]),
+      path: safeDecode(match[2]),
+    };
   } catch {
-    return "";
+    return null;
   }
+}
+
+export function extractSupabaseStoragePath(fileUrl: string) {
+  return parseStorageReference(fileUrl)?.path || "";
 }
 
 export function isAbsoluteHttpUrl(value: string) {
