@@ -102,7 +102,13 @@ export default function TenantProfilePage() {
   const pattern = getPaymentPattern();
 
   const getPayment = (m: number) => payments?.find((p) => p.month === m);
-  const getPaymentStatus = (m: number) => getPayment(m)?.status || "pending";
+  const getPaymentStatus = (m: number) => {
+    const p = getPayment(m);
+    if (p) return p.status;
+    if (year !== currentYear) return "pending";
+    if (isOverdue(m, year, tenant.payment_day || 10, tenant.payment_cycle, now)) return "overdue";
+    return "pending";
+  };
 
   // Calculate late fee amount
   const calcFinalAmount = () => {
@@ -155,6 +161,7 @@ export default function TenantProfilePage() {
       rent_amount: tenant.rent_amount, deposit: tenant.deposit || "", payment_day: tenant.payment_day || 10,
       entry_date: tenant.entry_date || "", exit_date: tenant.exit_date || "", cpf: tenant.cpf || "",
       property_id: tenant.property_id || "", notes: tenant.notes || "",
+      payment_cycle: tenant.payment_cycle || "postecipado",
     });
     setEditOpen(true);
   };
@@ -169,6 +176,7 @@ export default function TenantProfilePage() {
         entry_date: editForm.entry_date || null, exit_date: editForm.exit_date || null,
         cpf: editForm.cpf || null, property_id: editForm.property_id || null,
         notes: editForm.notes || null,
+        payment_cycle: editForm.payment_cycle || "postecipado",
       });
       toast.success("Salvo!");
       setEditOpen(false);
