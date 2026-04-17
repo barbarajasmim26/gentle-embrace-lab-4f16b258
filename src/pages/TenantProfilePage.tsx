@@ -176,6 +176,8 @@ export default function TenantProfilePage() {
       property_id: tenant.property_id || "", notes: tenant.notes || "",
       payment_cycle: tenant.payment_cycle || "postecipado",
       status: tenant.status || "active",
+      default_late_fee_percent: tenant.default_late_fee_percent ?? "",
+      default_interest_percent: tenant.default_interest_percent ?? "",
     });
     setEditOpen(true);
   };
@@ -192,6 +194,8 @@ export default function TenantProfilePage() {
         notes: editForm.notes || null,
         payment_cycle: editForm.payment_cycle || "postecipado",
         status: editForm.status || "active",
+        default_late_fee_percent: editForm.default_late_fee_percent === "" || editForm.default_late_fee_percent == null ? null : Number(editForm.default_late_fee_percent),
+        default_interest_percent: editForm.default_interest_percent === "" || editForm.default_interest_percent == null ? null : Number(editForm.default_interest_percent),
       });
       toast.success("Salvo!");
       setEditOpen(false);
