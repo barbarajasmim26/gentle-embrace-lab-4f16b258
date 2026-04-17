@@ -275,10 +275,17 @@ export default function TenantProfilePage() {
     }
   };
 
-  const getDocUrl = (path: string) => {
-    if (isAbsoluteHttpUrl(path)) return path;
-    const { data } = supabase.storage.from("contracts").getPublicUrl(path);
-    return data.publicUrl;
+  const openDocument = async (path: string) => {
+    if (isAbsoluteHttpUrl(path)) {
+      window.open(path, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const { data, error } = await supabase.storage.from("contracts").createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir o documento.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const detailPayment = getPayment(detailMonth);
