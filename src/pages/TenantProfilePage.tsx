@@ -18,6 +18,7 @@ import { isAbsoluteHttpUrl, parseStorageReference } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
 import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
+import { useAppSettings, resolveFees } from "@/hooks/use-settings";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -46,6 +47,7 @@ export default function TenantProfilePage() {
   const { data: allPayments } = useAllPayments(currentYear);
   const updateTenant = useUpdateTenant();
   const upsertPayment = useUpsertPayment();
+  const { data: settings } = useAppSettings();
   
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -134,10 +136,11 @@ export default function TenantProfilePage() {
   const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
     const currentStatus = existing?.status || "pending";
+    const { lateFee, interest } = resolveFees(tenant, settings);
     setPayMonth(m);
     setPayStatus(currentStatus === "pending" ? "paid" : currentStatus as PaymentStatusType);
-    setPayLateFee("10");
-    setPayInterest("1");
+    setPayLateFee(String(existing?.late_fee_percent ?? lateFee));
+    setPayInterest(String(existing?.interest_percent ?? interest));
     setPayCustomAmount("");
     setPayDate(existing?.paid_at || new Date().toISOString().split("T")[0]);
     setPayDialogOpen(true);
