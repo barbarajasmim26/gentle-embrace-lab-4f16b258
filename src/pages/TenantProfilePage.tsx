@@ -492,31 +492,28 @@ export default function TenantProfilePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {documents.map((doc) => (
+                  {documents.map((doc: any) => (
                     <div key={doc.id} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors group">
-                      <a
-                        href={getDocUrl(doc.file_url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 flex-1 min-w-0"
+                      <button
+                        type="button"
+                        onClick={() => openDocument(doc.file_url)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
                       >
                         <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold truncate">{doc.title}</p>
+                          <p className="text-sm font-bold truncate">{doc.title || doc.file_name}</p>
                           <p className="text-[10px] text-muted-foreground uppercase">{doc.category || "Documento"}</p>
                         </div>
-                      </a>
+                      </button>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDoc(doc)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        <a href={getDocUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </a>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDocument(doc.file_url)}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
