@@ -50,14 +50,23 @@ export default function WhatsAppPage() {
   const [editingKey, setEditingKey] = useState<TemplateKey | null>(null);
   const [editDraft, setEditDraft] = useState("");
 
+  const DEFAULT_LATE_FEE = 10;
+  const DEFAULT_INTEREST = 1;
+
   const buildFillData = (tenantId: string): FillData | null => {
     const t = tenants?.find((x) => x.id === tenantId);
     if (!t) return null;
+    const amount = Number(t.rent_amount);
+    const fee = amount * (DEFAULT_LATE_FEE / 100);
+    const int = amount * (DEFAULT_INTEREST / 100);
     return {
-      name: t.name, amount: Number(t.rent_amount),
+      name: t.name, amount,
       month: Number(refMonth), year: Number(refYear),
       property: t.property?.address || "", houseNumber: t.house_number || "",
       dueDay: t.payment_day || 10,
+      lateFee: DEFAULT_LATE_FEE,
+      interest: DEFAULT_INTEREST,
+      totalWithFees: amount + fee + int,
     };
   };
 
