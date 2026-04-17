@@ -16,28 +16,34 @@ export type Database = {
     Tables: {
       documents: {
         Row: {
+          category: string | null
           created_at: string
           file_name: string
           file_type: string | null
           file_url: string
           id: string
           tenant_id: string
+          title: string | null
         }
         Insert: {
+          category?: string | null
           created_at?: string
           file_name: string
           file_type?: string | null
           file_url: string
           id?: string
           tenant_id: string
+          title?: string | null
         }
         Update: {
+          category?: string | null
           created_at?: string
           file_name?: string
           file_type?: string | null
           file_url?: string
           id?: string
           tenant_id?: string
+          title?: string | null
         }
         Relationships: [
           {
