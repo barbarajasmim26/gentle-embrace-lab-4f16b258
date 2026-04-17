@@ -16,6 +16,7 @@ import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whats
 import { generateReceipt } from "@/lib/receipt-generator";
 import { extractSupabaseStoragePath, isAbsoluteHttpUrl } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
+import { isOverdue, PAYMENT_CYCLE_LABELS } from "@/lib/payment-status";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
