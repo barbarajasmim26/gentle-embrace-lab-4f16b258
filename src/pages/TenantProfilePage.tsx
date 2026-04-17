@@ -25,7 +25,8 @@ type PaymentStatusType = "paid" | "paid_late" | "pending" | "deposit";
 const STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: any }> = {
   paid: { label: "Em dia", colorClass: "bg-success/10 text-success border-success/30", icon: CheckCircle2 },
   paid_late: { label: "Atrasado", colorClass: "bg-warning/10 text-warning border-warning/30", icon: Clock },
-  pending: { label: "Pend.", colorClass: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
+  pending: { label: "Pend.", colorClass: "bg-muted text-muted-foreground border-border", icon: Clock },
+  overdue: { label: "Atrasado", colorClass: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
   deposit: { label: "Caução", colorClass: "bg-primary/10 text-primary border-primary/30", icon: DollarSign },
 };
 
@@ -367,6 +368,7 @@ export default function TenantProfilePage() {
           { icon: DollarSign, label: "Aluguel", value: `R$ ${rentAmount.toFixed(2)}`, colorClass: "text-success" },
           { icon: DollarSign, label: "Caução", value: `R$ ${Number(tenant.deposit || 0).toFixed(2)}`, colorClass: "text-primary" },
           { icon: Calendar, label: "Vencimento", value: `Dia ${tenant.payment_day}`, colorClass: "text-primary" },
+          { icon: Clock, label: "Ciclo", value: tenant.payment_cycle === "antecipado" ? "Paga e mora" : "Mora e paga", colorClass: "text-accent" },
           { icon: Calendar, label: "Entrada", value: tenant.entry_date ? new Date(tenant.entry_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
           { icon: Calendar, label: "Saída", value: tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
           { icon: User, label: "CPF", value: tenant.cpf || "—", colorClass: "text-muted-foreground" },
