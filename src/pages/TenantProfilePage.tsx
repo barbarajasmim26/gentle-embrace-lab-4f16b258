@@ -806,6 +806,19 @@ export default function TenantProfilePage() {
               <div><Label>Entrada</Label><Input type="date" value={editForm.entry_date || ""} onChange={(e) => setEditForm({ ...editForm, entry_date: e.target.value })} /></div>
               <div><Label>Saída</Label><Input type="date" value={editForm.exit_date || ""} onChange={(e) => setEditForm({ ...editForm, exit_date: e.target.value })} /></div>
             </div>
+            <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground">Multa e Juros (deixe vazio para usar o padrão global)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Multa (%)</Label>
+                  <Input type="number" step="0.1" placeholder={`Padrão: ${settings?.default_late_fee_percent ?? 10}`} value={editForm.default_late_fee_percent ?? ""} onChange={(e) => setEditForm({ ...editForm, default_late_fee_percent: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Juros mensal (%)</Label>
+                  <Input type="number" step="0.1" placeholder={`Padrão: ${settings?.default_interest_percent ?? 1}`} value={editForm.default_interest_percent ?? ""} onChange={(e) => setEditForm({ ...editForm, default_interest_percent: e.target.value })} />
+                </div>
+              </div>
+            </div>
             <div><Label>Observações</Label><Textarea value={editForm.notes || ""} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} placeholder="Anotações importantes..." rows={3} /></div>
             <Button className="w-full rounded-xl" onClick={saveEdit} disabled={updateTenant.isPending}>Salvar</Button>
           </div>
