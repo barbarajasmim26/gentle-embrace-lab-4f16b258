@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
 import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
+import { calculateTenantFees } from "@/lib/fee-utils";
 
 export default function OverduePage() {
   const now = new Date();
@@ -35,23 +36,40 @@ export default function OverduePage() {
     return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
   }) || [];
 
-  const calcFees = (amount: number, lateFee = 10, interest = 1) => {
-    const fee = amount * (lateFee / 100);
-    const int = amount * (interest / 100);
-    return { fee, interest: int, total: amount + fee + int };
+  const getFees = (t: any, date: Date = now) => {
+    return calculateTenantFees(
+      Number(t.rent_amount),
+      month,
+      year,
+      t.payment_day || 10,
+      t.payment_cycle || "postecipado",
+      date,
+      Number(payLateFee || 10),
+      Number(payInterest || 1)
+    );
   };
 
-  const pendingRevenue = overdue.reduce((sum, t) => sum + calcFees(Number(t.rent_amount)).total, 0);
+  const pendingRevenue = overdue.reduce((sum, t) => {
+    const { totalAmount } = getFees(t);
+    return sum + totalAmount;
+  }, 0);
 
   const sendOverdueWhatsApp = (t: any) => {
     if (!t.phone) { toast.error("Telefone não cadastrado."); return; }
-    const { total } = calcFees(Number(t.rent_amount));
+    const { totalAmount, daysOverdue } = getFees(t);
     const templates = getMessageTemplates({
       name: t.name, amount: Number(t.rent_amount), month, year,
       property: t.property?.address || "", houseNumber: t.house_number || "",
-      dueDay: t.payment_day || 10, lateFee: 10, interest: 1, totalWithFees: total,
+      dueDay: t.payment_day || 10, lateFee: 10, interest: 1, totalWithFees: totalAmount,
     });
-    openWhatsApp({ phone: t.phone, message: templates.overdue });
+    
+    // Adiciona informação de dias de atraso se for relevante
+    let message = templates.overdue;
+    if (daysOverdue > 0) {
+      message = message.replace("está em atraso.", `está em atraso há ${daysOverdue} dias.`);
+    }
+    
+    openWhatsApp({ phone: t.phone, message });
   };
 
   const openPayDialog = (t: any) => {
@@ -68,7 +86,18 @@ export default function OverduePage() {
     if (!payTenant) return 0;
     const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
     if (payStatus === "paid") return base;
-    return base + base * (Number(payLateFee) / 100) + base * (Number(payInterest) / 100);
+    
+    const { totalAmount } = calculateTenantFees(
+      base,
+      month,
+      year,
+      payTenant.payment_day || 10,
+      payTenant.payment_cycle || "postecipado",
+      new Date(payDate + "T12:00:00"), // Evita problemas de fuso horário
+      Number(payLateFee),
+      Number(payInterest)
+    );
+    return totalAmount;
   };
 
   const confirmPayment = async () => {
@@ -141,7 +170,7 @@ export default function OverduePage() {
         <div className="space-y-4">
           {overdue.map((t) => {
             const rent = Number(t.rent_amount);
-            const { fee, interest, total } = calcFees(rent);
+            const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = getFees(t);
             return (
               <Card key={t.id} className="rounded-2xl hover:shadow-lg transition-all">
                 <CardContent className="py-5 px-5">
@@ -156,7 +185,7 @@ export default function OverduePage() {
                         <p className="text-xs text-muted-foreground">{t.property?.address} — Casa {t.house_number}</p>
                         <div className="flex gap-2 mt-2">
                           <Badge className="text-[10px] bg-orange-100 text-orange-700 border-orange-200">Venceu dia {t.payment_day}</Badge>
-                          <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">{daysOverdue} dias de atraso</Badge>
                         </div>
                       </div>
                     </div>
@@ -169,15 +198,15 @@ export default function OverduePage() {
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] font-semibold text-destructive uppercase">Multa (10%)</p>
-                        <p className="font-bold text-sm text-destructive">R$ {fee.toFixed(2)}</p>
+                        <p className="font-bold text-sm text-destructive">R$ {lateFeeAmount.toFixed(2)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Juros (1%)</p>
-                        <p className="font-bold text-sm text-destructive">R$ {interest.toFixed(2)}</p>
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Juros (1%/mês)</p>
+                        <p className="font-bold text-sm text-destructive">R$ {interestAmount.toFixed(2)}</p>
                       </div>
                       <div className="text-center bg-destructive/10 rounded-xl px-3 py-1.5">
                         <p className="text-[10px] font-semibold text-destructive uppercase">Total</p>
-                        <p className="font-bold text-lg text-destructive">R$ {total.toFixed(2)}</p>
+                        <p className="font-bold text-lg text-destructive">R$ {totalAmount.toFixed(2)}</p>
                       </div>
                     </div>
 
@@ -229,16 +258,34 @@ export default function OverduePage() {
               <div><Label>Data do pagamento</Label><Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></div>
               {payStatus === "paid_late" && (
                 <div className="space-y-3 p-3 rounded-lg border border-orange-300/30 bg-orange-50 dark:bg-orange-500/10">
-                  <p className="text-sm font-semibold text-orange-600">Multa e Juros</p>
+                  <p className="text-sm font-semibold text-orange-600">Multa e Juros (Cálculo Diário)</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div><Label className="text-xs">Multa (%)</Label><Input type="number" step="0.1" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} /></div>
-                    <div><Label className="text-xs">Juros (%)</Label><Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} /></div>
+                    <div><Label className="text-xs">Juros Mensal (%)</Label><Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} /></div>
                   </div>
                   <div className="text-sm space-y-1">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {Number(payTenant.rent_amount).toFixed(2)}</span></div>
-                    <div className="flex justify-between text-orange-600"><span>Multa ({payLateFee}%):</span><span>R$ {(Number(payTenant.rent_amount) * (Number(payLateFee) / 100)).toFixed(2)}</span></div>
-                    <div className="flex justify-between text-orange-600"><span>Juros ({payInterest}%):</span><span>R$ {(Number(payTenant.rent_amount) * (Number(payInterest) / 100)).toFixed(2)}</span></div>
-                    <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {calcPayAmount().toFixed(2)}</span></div>
+                    {(() => {
+                      const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
+                      const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = calculateTenantFees(
+                        base,
+                        month,
+                        year,
+                        payTenant.payment_day || 10,
+                        payTenant.payment_cycle || "postecipado",
+                        new Date(payDate + "T12:00:00"),
+                        Number(payLateFee),
+                        Number(payInterest)
+                      );
+                      return (
+                        <>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Atraso:</span><span className="font-semibold">{daysOverdue} dias</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {base.toFixed(2)}</span></div>
+                          <div className="flex justify-between text-orange-600"><span>Multa ({payLateFee}%):</span><span>R$ {lateFeeAmount.toFixed(2)}</span></div>
+                          <div className="flex justify-between text-orange-600"><span>Juros ({payInterest}%/mês):</span><span>R$ {interestAmount.toFixed(2)}</span></div>
+                          <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {totalAmount.toFixed(2)}</span></div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

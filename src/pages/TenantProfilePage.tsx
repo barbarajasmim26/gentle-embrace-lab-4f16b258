@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, useProperties, useAllPayments } from "@/hooks/use-tenants";
-import { useDocuments } from "@/hooks/use-documents";
+import { useDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle, Download } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle, Download, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whatsapp";
 import { generateReceipt } from "@/lib/receipt-generator";
 import { extractSupabaseStoragePath, isAbsoluteHttpUrl } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
 import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
+import { calculateTenantFees } from "@/lib/fee-utils";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -36,16 +37,26 @@ export default function TenantProfilePage() {
   const { data: tenant, isLoading } = useTenant(id!);
   const { data: properties } = useProperties();
   const { data: documents, refetch: refetchDocs } = useDocuments(id);
+  const uploadDoc = useUploadDocument();
+  const deleteDoc = useDeleteDocument();
+  
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const { data: payments } = usePayments(id, year);
   const { data: allPayments } = useAllPayments(currentYear);
   const updateTenant = useUpdateTenant();
   const upsertPayment = useUpsertPayment();
+  
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesValue, setNotesValue] = useState("");
+
+  // Document upload state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadCategory, setUploadCategory] = useState("contract");
 
   // Payment dialog state
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -89,22 +100,7 @@ export default function TenantProfilePage() {
   // Payment pattern
   const getPaymentPattern = () => {
     if (tenant.status === "irregular") return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30", desc: "Pagamento instável" };
-    
-    if (!allPayments) return null;
-    const recentPayments: string[] = [];
-    for (let m = month - 1; m >= Math.max(1, month - 6); m--) {
-      const p = allPayments.find((pay: any) => pay.tenant_id === id && pay.month === m);
-      if (p) recentPayments.push(p.status);
-    }
-    const paidOnTime = recentPayments.filter((s) => s === "paid").length;
-    const paidLate = recentPayments.filter((s) => s === "paid_late").length;
-    const total = recentPayments.length;
-    if (total === 0) return null;
-    const ratio = (paidOnTime + paidLate) / total;
-    if (ratio >= 0.8 && paidLate <= 1) return { label: "Bom pagador", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30", desc: "Costuma pagar em dia" };
-    if (paidLate > paidOnTime) return { label: "Paga com atraso", icon: TrendingDown, colorClass: "bg-warning/10 text-warning border-warning/30", desc: "Paga, mas frequentemente atrasado" };
-    if (ratio <= 0.3) return { label: "Inadimplente", icon: AlertTriangle, colorClass: "bg-destructive/10 text-destructive border-destructive/30", desc: "Atrasos frequentes" };
-    return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30", desc: "Pagamento instável" };
+    return { label: "Normal", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30", desc: "Pagamento regular" };
   };
 
   const pattern = getPaymentPattern();
@@ -121,9 +117,18 @@ export default function TenantProfilePage() {
   const calcFinalAmount = () => {
     const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
     if (payStatus === "paid" || payStatus === "pending" || payStatus === "deposit") return base;
-    const feePercent = Number(payLateFee) || 0;
-    const intPercent = Number(payInterest) || 0;
-    return base + base * (feePercent / 100) + base * (intPercent / 100);
+    
+    const { totalAmount } = calculateTenantFees(
+      base,
+      payMonth,
+      year,
+      tenant.payment_day || 10,
+      tenant.payment_cycle || "postecipado",
+      new Date(payDate + "T12:00:00"),
+      Number(payLateFee),
+      Number(payInterest)
+    );
+    return totalAmount;
   };
 
   const handlePaymentClick = (m: number) => {
@@ -218,101 +223,209 @@ export default function TenantProfilePage() {
     generateReceipt({
       tenantName: tenant.name,
       amount: Number(p.amount || rentAmount),
+      paymentMethod: "PIX",
       month: m,
       year: year,
-      propertyAddress: tenant.property?.address || "",
-      houseNumber: tenant.house_number || "",
-      paymentDate: p.paid_at || new Date().toISOString().split("T")[0],
+      property: tenant.property,
+      houseNumber: tenant.house_number,
+      cpf: tenant.cpf,
     });
   };
 
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadTitle) {
+      toast.error("Selecione um arquivo e informe um título.");
+      return;
+    }
+    try {
+      await uploadDoc.mutateAsync({
+        tenantId: id!,
+        file: uploadFile,
+        title: uploadTitle,
+        category: uploadCategory,
+      });
+      toast.success("Documento enviado!");
+      setUploadOpen(false);
+      setUploadFile(null);
+      setUploadTitle("");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleDeleteDoc = async (doc: any) => {
+    if (!confirm("Excluir este documento?")) return;
+    try {
+      await deleteDoc.mutateAsync({
+        id: doc.id,
+        tenantId: id!,
+        filePath: doc.file_url,
+      });
+      toast.success("Documento excluído!");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const getDocUrl = (path: string) => {
+    if (isAbsoluteHttpUrl(path)) return path;
+    const { data } = supabase.storage.from("contracts").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
   const detailPayment = getPayment(detailMonth);
-  const detailConfig = detailPayment ? STATUS_CONFIG[detailPayment.status] || STATUS_CONFIG.pending : STATUS_CONFIG.pending;
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      {/* Header & Quick Actions */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/tenants")} className="rounded-xl hover:bg-muted/50">
-            <ArrowLeft className="mr-1 h-4 w-4" />Voltar
+      {/* Top Navigation */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" className="rounded-lg gap-1" onClick={() => navigate("/tenants")}>
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={handleEdit}>
+            <Edit className="h-4 w-4" /> Editar
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="rounded-xl border-primary/20 hover:bg-primary/5" onClick={handleEdit}>
-              <Edit className="mr-1 h-4 w-4" />Editar
-            </Button>
-            <Button variant="outline" size="sm" className="rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5" onClick={moveToFormer}>
-              <UserX className="mr-1 h-4 w-4" />Finalizar
-            </Button>
+          <Button variant="outline" size="sm" className="rounded-lg text-destructive hover:bg-destructive/10 gap-1" onClick={moveToFormer}>
+            <UserX className="h-4 w-4" /> Encerrar
+          </Button>
+        </div>
+      </div>
+
+      {/* Profile Header */}
+      <div className="flex flex-col md:flex-row gap-6 items-start">
+        <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10 text-primary shrink-0">
+          <User className="h-12 w-12" />
+        </div>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-3xl font-bold tracking-tight">{tenant.name}</h1>
+            {pattern && (
+              <Badge className={`rounded-full px-3 py-0.5 border-0 ${pattern.colorClass}`}>
+                <pattern.icon className="mr-1 h-3 w-3" /> {pattern.label}
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-sm">
+              <MapPin className="h-4 w-4" /> {tenant.property?.name || tenant.property?.address}, Casa {tenant.house_number}
+            </div>
+            {tenant.phone && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Phone className="h-4 w-4" /> {tenant.phone}
+              </div>
+            )}
+            {tenant.cpf && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <FileText className="h-4 w-4" /> CPF: {tenant.cpf}
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="flex items-start gap-4 flex-wrap">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-2xl font-bold shadow-lg shadow-primary/20">
-            {tenant.name.charAt(0)}
-          </div>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight">{tenant.name}</h1>
-            <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg text-xs">
-                <MapPin className="h-3.5 w-3.5" />{tenant.property?.name || tenant.property?.address} · Casa {tenant.house_number}
-              </span>
-              {tenant.phone && (
-                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg text-xs">
-                  <Phone className="h-3.5 w-3.5" />{tenant.phone}
-                </span>
-              )}
-            </div>
-          </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button className="flex-1 md:flex-none rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2" onClick={() => openWhatsAppChat(tenant.phone)}>
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="rounded-2xl border-0 bg-primary/5 shadow-none">
-              <CardContent className="p-4 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Total Pago {year}</p>
+        {/* Left Column: Stats & Info */}
+        <div className="space-y-6">
+          {/* Quick Stats */}
+          <Card className="rounded-2xl border-0 shadow-sm bg-muted/30">
+            <CardContent className="p-5 grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Pago ({year})</p>
                 <p className="text-lg font-bold text-primary">R$ {totalPaidYear.toLocaleString("pt-BR")}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-2xl border-0 bg-destructive/5 shadow-none">
-              <CardContent className="p-4 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Meses pendentes</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Meses Pendentes</p>
                 <p className="text-lg font-bold text-destructive">{totalPendingYear}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-2xl border-0 bg-success/5 shadow-none">
-              <CardContent className="p-4 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Meses pagos</p>
-                <p className="text-lg font-bold text-success">{paidMonths}</p>
-              </CardContent>
-            </Card>
-            <Card className="rounded-2xl border-0 bg-accent/5 shadow-none">
-              <CardContent className="p-4 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Status</p>
-                <div className="flex justify-center mt-1">
-                  {pattern && (
-                    <Badge variant="outline" className={`text-[10px] ${pattern.colorClass}`}>
-                      <pattern.icon className="h-3 w-3 mr-1" />{pattern.label}
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Meses Pagos</p>
+                <p className="text-lg font-bold text-emerald-600">{paidMonths}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Último Pagamento</p>
+                <p className="text-sm font-bold">{lastPayment ? new Date(lastPayment.paid_at || "").toLocaleDateString("pt-BR") : "Nenhum"}</p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Payment Calendar */}
-          <Card className="rounded-2xl overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />Pagamentos {year}
+          {/* Contract Details */}
+          <Card className="rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" /> Detalhes do Contrato
               </CardTitle>
-              <div className="flex items-center gap-1 border rounded-lg p-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setYear(year - 1)}><ArrowLeft className="h-3 w-3" /></Button>
-                <span className="text-xs font-bold px-2">{year}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setYear(year + 1)} disabled={year >= currentYear}><Edit className="h-3 w-3 rotate-180" /></Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase">Aluguel</Label>
+                  <p className="font-bold text-lg">R$ {rentAmount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase">Dia Vencimento</Label>
+                  <p className="font-bold text-lg">Todo dia {tenant.payment_day}</p>
+                </div>
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground uppercase">Ciclo de Pagamento</Label>
+                <p className="font-medium text-sm">{PAYMENT_CYCLE_LABELS[tenant.payment_cycle || "postecipado"]}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase">Data Entrada</Label>
+                  <p className="text-sm font-medium">{tenant.entry_date ? new Date(tenant.entry_date).toLocaleDateString("pt-BR") : "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground uppercase">Data Saída</Label>
+                  <p className="text-sm font-medium">{tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—"}</p>
+                </div>
+              </div>
+              {tenant.deposit && (
+                <div className="pt-2 border-t">
+                  <Label className="text-[10px] text-muted-foreground uppercase">Caução</Label>
+                  <p className="text-sm font-bold text-primary">R$ {Number(tenant.deposit).toFixed(2)}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notes */}
+          <Card className="rounded-2xl">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-muted-foreground" /> Observações
+              </CardTitle>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openNotesDialog}>
+                <Edit className="h-3 w-3" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">
+                {tenant.notes || "Nenhuma observação cadastrada."}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Payment Calendar & Documents */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Payment Calendar */}
+          <Card className="rounded-2xl">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold">Calendário de Pagamentos</CardTitle>
+                <p className="text-xs text-muted-foreground">Clique em um mês para registrar ou ver detalhes</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setYear(year - 1)}><ArrowLeft className="h-4 w-4" /></Button>
+                <span className="font-bold text-sm w-12 text-center">{year}</span>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setYear(year + 1)} disabled={year >= currentYear + 1}><ArrowLeft className="h-4 w-4 rotate-180" /></Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -321,111 +434,139 @@ export default function TenantProfilePage() {
                   const mNum = i + 1;
                   const status = getPaymentStatus(mNum);
                   const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-                  const isCurrent = year === currentYear && mNum === month;
-
+                  const isFuture = year > currentYear || (year === currentYear && mNum > month);
+                  
                   return (
-                    <div
+                    <button
                       key={m}
-                      onClick={() => handlePaymentClick(mNum)}
-                      onDoubleClick={() => openPayDetail(mNum)}
-                      className={`group relative flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none hover:shadow-md ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : ""} ${config.colorClass}`}
+                      disabled={isFuture}
+                      onClick={() => status === "pending" || status === "overdue" ? handlePaymentClick(mNum) : openPayDetail(mNum)}
+                      className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${isFuture ? "opacity-30 cursor-not-allowed" : "hover:shadow-md active:scale-95"} ${config.colorClass}`}
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-2">{m}</span>
-                      <config.icon className="h-5 w-5 mb-2" />
-                      <span className="text-[10px] font-semibold">{config.label}</span>
-                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Edit className="h-2.5 w-2.5" />
-                      </div>
-                    </div>
+                      <span className="text-[10px] font-bold uppercase mb-1">{m}</span>
+                      <config.icon className="h-5 w-5 mb-1" />
+                      <span className="text-[10px] font-medium">{config.label}</span>
+                    </button>
                   );
                 })}
               </div>
-              <div className="mt-6 p-4 rounded-xl bg-muted/30 border border-dashed flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold">Dica de Gestão</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">Clique em um mês para registrar pagamento. Clique duas vezes para ver detalhes e gerar recibo.</p>
-                </div>
+              
+              <div className="mt-6 flex flex-wrap gap-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider justify-center border-t pt-4">
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-success" /> Em dia</div>
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-warning" /> Atrasado</div>
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-destructive" /> Vencido</div>
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-muted" /> Pendente</div>
+                <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-primary" /> Caução</div>
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        <div className="space-y-6">
-          {/* Info Card */}
+          {/* Documents */}
           <Card className="rounded-2xl">
-            <CardHeader><CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Informações Gerais</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {[
-                  { icon: DollarSign, label: "Aluguel", value: `R$ ${rentAmount.toFixed(2)}`, colorClass: "text-emerald-600" },
-                  { icon: DollarSign, label: "Caução", value: tenant.deposit ? `R$ ${Number(tenant.deposit).toFixed(2)}` : "Não informado", colorClass: "text-primary" },
-                  { icon: Calendar, label: "Dia de Pagamento", value: `Todo dia ${tenant.payment_day}`, colorClass: "text-blue-600" },
-                  { icon: Clock, label: "Ciclo", value: tenant.payment_cycle === "antecipado" ? "Paga e mora" : "Mora e paga", colorClass: "text-accent" },
-                  { icon: User, label: "CPF", value: tenant.cpf || "Não informado", colorClass: "text-muted-foreground" },
-                  { icon: MapPin, label: "Entrada", value: tenant.entry_date ? new Date(tenant.entry_date + "T12:00:00").toLocaleDateString("pt-BR") : "Não informada", colorClass: "text-muted-foreground" },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-muted last:border-0">
-                    <span className="flex items-center gap-2 text-muted-foreground"><item.icon className="h-4 w-4" />{item.label}</span>
-                    <span className={`font-semibold ${item.colorClass}`}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
-              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={openNotesDialog}>
-                <StickyNote className="h-4 w-4" />Observações
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-bold">Documentos e Contratos</CardTitle>
+              <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => setUploadOpen(true)}>
+                <Plus className="h-4 w-4" /> Adicionar
               </Button>
+            </CardHeader>
+            <CardContent>
+              {!documents?.length ? (
+                <div className="text-center py-8 border-2 border-dashed rounded-2xl">
+                  <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Nenhum documento anexado.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-colors group">
+                      <a
+                        href={getDocUrl(doc.file_url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 flex-1 min-w-0"
+                      >
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold truncate">{doc.title}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">{doc.category || "Documento"}</p>
+                        </div>
+                      </a>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDoc(doc)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <a href={getDocUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Upload Document Dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Adicionar Documento</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Título</Label>
+              <Input value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="Ex: Contrato de Aluguel" />
+            </div>
+            <div>
+              <Label>Categoria</Label>
+              <Select value={uploadCategory} onValueChange={setUploadCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contract">Contrato</SelectItem>
+                  <SelectItem value="id">Identidade / CPF</SelectItem>
+                  <SelectItem value="receipt">Comprovante</SelectItem>
+                  <SelectItem value="other">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Arquivo (PDF ou Imagem)</Label>
+              <Input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+            </div>
+            <Button className="w-full rounded-xl" onClick={handleUpload} disabled={uploadDoc.isPending}>
+              {uploadDoc.isPending ? "Enviando..." : "Enviar Documento"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              Registrar Pagamento — {MONTHS[payMonth - 1]}/{year}
+              <DollarSign className="h-5 w-5 text-emerald-500" /> Registrar Pagamento — {MONTHS[payMonth - 1]}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-semibold text-sm">{tenant.name}</p>
-              <p className="text-xs text-muted-foreground">Aluguel: R$ {rentAmount.toFixed(2)} · Vencimento: Dia {tenant.payment_day}</p>
-            </div>
-
             <div className="space-y-2">
-              <Label className="font-semibold">Status do pagamento</Label>
+              <Label className="font-semibold">Status</Label>
               <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant={payStatus === "paid" ? "default" : "outline"}
-                  className={`rounded-lg ${payStatus === "paid" ? "bg-success hover:bg-success/90 text-success-foreground" : ""}`}
-                  onClick={() => setPayStatus("paid")}
-                >
+                <Button variant={payStatus === "paid" ? "default" : "outline"} className={`rounded-lg ${payStatus === "paid" ? "bg-emerald-500 hover:bg-emerald-600 text-white" : ""}`} onClick={() => setPayStatus("paid")}>
                   <CheckCircle2 className="mr-1 h-4 w-4" />Pago em dia
                 </Button>
-                <Button
-                  variant={payStatus === "paid_late" ? "default" : "outline"}
-                  className={`rounded-lg ${payStatus === "paid_late" ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}`}
-                  onClick={() => setPayStatus("paid_late")}
-                >
+                <Button variant={payStatus === "paid_late" ? "default" : "outline"} className={`rounded-lg ${payStatus === "paid_late" ? "bg-orange-500 hover:bg-orange-600 text-white" : ""}`} onClick={() => setPayStatus("paid_late")}>
                   <Clock className="mr-1 h-4 w-4" />Pago em atraso
                 </Button>
-                <Button
-                  variant={payStatus === "pending" ? "default" : "outline"}
-                  className={`rounded-lg ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : ""}`}
-                  onClick={() => setPayStatus("pending")}
-                >
-                  <XCircle className="mr-1 h-4 w-4" />Pendente
+                <Button variant={payStatus === "deposit" ? "default" : "outline"} className={`rounded-lg ${payStatus === "deposit" ? "bg-primary hover:bg-primary/90 text-white" : ""}`} onClick={() => setPayStatus("deposit")}>
+                  <DollarSign className="mr-1 h-4 w-4" />Usar Caução
                 </Button>
-                <Button
-                  variant={payStatus === "deposit" ? "default" : "outline"}
-                  className={`rounded-lg ${payStatus === "deposit" ? "bg-primary hover:bg-primary/90 text-primary-foreground" : ""}`}
-                  onClick={() => setPayStatus("deposit")}
-                >
-                  <DollarSign className="mr-1 h-4 w-4" />Caução
+                <Button variant={payStatus === "pending" ? "default" : "outline"} className="rounded-lg" onClick={() => setPayStatus("pending")}>
+                  <XCircle className="mr-1 h-4 w-4" />Pendente
                 </Button>
               </div>
             </div>
@@ -438,36 +579,58 @@ export default function TenantProfilePage() {
             )}
 
             {payStatus === "paid_late" && (
-              <div className="space-y-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
-                <p className="text-sm font-semibold text-warning">Multa e Juros</p>
+              <div className="space-y-3 p-3 rounded-lg border border-orange-300/30 bg-orange-50 dark:bg-orange-500/10">
+                <p className="text-sm font-semibold text-orange-600">Multa e Juros (Cálculo Diário)</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Multa (%)</Label>
                     <Input type="number" step="0.1" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} />
                   </div>
                   <div>
-                    <Label className="text-xs">Juros (%)</Label>
+                    <Label className="text-xs">Juros Mensal (%)</Label>
                     <Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} />
                   </div>
                 </div>
                 <div className="text-sm space-y-1">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {rentAmount.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-warning"><span>Multa ({payLateFee}%):</span><span>R$ {(rentAmount * (Number(payLateFee) / 100)).toFixed(2)}</span></div>
-                  <div className="flex justify-between text-warning"><span>Juros ({payInterest}%):</span><span>R$ {(rentAmount * (Number(payInterest) / 100)).toFixed(2)}</span></div>
-                  <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {calcFinalAmount().toFixed(2)}</span></div>
+                  {(() => {
+                    const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
+                    const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = calculateTenantFees(
+                      base,
+                      payMonth,
+                      year,
+                      tenant.payment_day || 10,
+                      tenant.payment_cycle || "postecipado",
+                      new Date(payDate + "T12:00:00"),
+                      Number(payLateFee),
+                      Number(payInterest)
+                    );
+                    return (
+                      <>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Atraso:</span><span className="font-semibold">{daysOverdue} dias</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {base.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-orange-600"><span>Multa ({payLateFee}%):</span><span>R$ {lateFeeAmount.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-orange-600"><span>Juros ({payInterest}%/mês):</span><span>R$ {interestAmount.toFixed(2)}</span></div>
+                        <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {totalAmount.toFixed(2)}</span></div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
 
-            {payStatus !== "pending" && (
-              <div>
-                <Label>Valor pago (opcional, se diferente)</Label>
-                <Input type="number" step="0.01" placeholder={calcFinalAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} />
-              </div>
-            )}
+            <div>
+              <Label>Valor pago (opcional)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={calcFinalAmount().toFixed(2)}
+                value={payCustomAmount}
+                onChange={(e) => setPayCustomAmount(e.target.value)}
+              />
+            </div>
 
-            <Button className={`w-full rounded-xl ${payStatus === "pending" ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : "bg-success hover:bg-success/90 text-success-foreground"}`} onClick={confirmPayment} disabled={upsertPayment.isPending}>
-              {upsertPayment.isPending ? "Salvando..." : payStatus === "pending" ? "Confirmar — Pendente" : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
+            <Button className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white" onClick={confirmPayment} disabled={upsertPayment.isPending}>
+              {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcFinalAmount().toFixed(2)}`}
             </Button>
           </div>
         </DialogContent>
@@ -477,27 +640,51 @@ export default function TenantProfilePage() {
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Detalhes — {MONTHS[detailMonth - 1]}/{year}</DialogTitle>
+            <DialogTitle>Detalhes do Pagamento — {MONTHS[detailMonth - 1]}</DialogTitle>
           </DialogHeader>
           {detailPayment ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className={detailConfig.colorClass}>
-                  <detailConfig.icon className="h-3 w-3 mr-1" />{detailConfig.label}
-                </Badge>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/50">
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Status</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {(() => {
+                      const config = STATUS_CONFIG[detailPayment.status] || STATUS_CONFIG.pending;
+                      return (
+                        <Badge className={`rounded-full border-0 ${config.colorClass}`}>
+                          <config.icon className="mr-1 h-3 w-3" /> {config.label}
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">Valor Total</p>
+                  <p className="text-xl font-bold text-primary">R$ {Number(detailPayment.amount).toFixed(2)}</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Valor pago:</span><p className="font-semibold">R$ {Number(detailPayment.amount || rentAmount).toFixed(2)}</p></div>
-                <div><span className="text-muted-foreground">Data:</span><p className="font-semibold">{detailPayment.paid_at ? new Date(detailPayment.paid_at + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</p></div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Data do pagamento:</span>
+                  <span className="font-medium">{detailPayment.paid_at ? new Date(detailPayment.paid_at).toLocaleDateString("pt-BR") : "—"}</span>
+                </div>
                 {detailPayment.status === "paid_late" && (
                   <>
-                    <div><span className="text-muted-foreground">Multa:</span><p className="font-semibold text-warning">{detailPayment.late_fee_percent}%</p></div>
-                    <div><span className="text-muted-foreground">Juros:</span><p className="font-semibold text-warning">{detailPayment.interest_percent}%</p></div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Multa aplicada:</span>
+                      <span className="font-medium text-warning">{detailPayment.late_fee_percent}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Juros aplicados:</span>
+                      <span className="font-medium text-warning">{detailPayment.interest_percent}%</span>
+                    </div>
                   </>
                 )}
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => {
+
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1 rounded-lg" onClick={() => {
                   setDetailOpen(false);
                   setPayMonth(detailMonth);
                   setPayStatus(detailPayment?.status === "paid_late" ? "paid_late" : "paid");
@@ -558,8 +745,8 @@ export default function TenantProfilePage() {
               <Select value={editForm.status || "active"} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Normal (Automático)</SelectItem>
-                  <SelectItem value="irregular">Irregular - Pagamento instável</SelectItem>
+                  <SelectItem value="active">Normal</SelectItem>
+                  <SelectItem value="irregular">Irregular</SelectItem>
                 </SelectContent>
               </Select>
             </div>

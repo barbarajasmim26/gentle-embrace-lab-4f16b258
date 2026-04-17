@@ -60,23 +60,10 @@ export default function TenantsPage() {
 
     // Se o usuário definiu um status manual de comportamento
     if (tenant.status === "irregular") {
-      return { label: "Irregular - Pagamento instável", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
+      return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
     }
 
-    if (!allPayments) return null;
-    const recentPayments: boolean[] = [];
-    for (let m = month - 1; m >= Math.max(1, month - 6); m--) {
-      const p = allPayments.find((pay: any) => pay.tenant_id === tenantId && pay.month === m);
-      recentPayments.push(isPaymentPaid(p?.status));
-    }
-    const paidCount = recentPayments.filter(Boolean).length;
-    const total = recentPayments.length;
-    if (total === 0) return null;
-    const ratio = paidCount / total;
-    
-    if (ratio >= 0.8) return { label: "Bom pagador", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30" };
-    if (ratio <= 0.3) return { label: "Inadimplente", icon: AlertTriangle, colorClass: "bg-destructive/10 text-destructive border-destructive/30" };
-    return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
+    return { label: "Normal", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30" };
   };
 
   const isOverdue = (tenantId: string) => {
