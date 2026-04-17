@@ -16,6 +16,8 @@ export interface Tenant {
   cpf: string | null;
   notes: string | null;
   payment_cycle: string | null;
+  default_late_fee_percent?: number | null;
+  default_interest_percent?: number | null;
   created_at: string;
   updated_at: string;
   property?: { id: string; address: string; name: string | null };
