@@ -67,15 +67,28 @@ export default function ReceiptPage() {
       toast.error("Selecione um inquilino para gerar o recibo.");
       return;
     }
-    const pdf = await generateReceipt(previewData);
-    if (mode === "download") {
-      pdf.save(`recibo_${previewData.tenantName}_${monthName}_${year}.pdf`);
-      toast.success("Recibo em PDF gerado com sucesso.");
-      return;
+    try {
+      const pdf = await generateReceipt(previewData);
+      const fileName = `recibo_${previewData.tenantName}_${monthName}_${year}.pdf`;
+      if (mode === "download") {
+        pdf.save(fileName);
+        toast.success("Recibo em PDF gerado com sucesso.");
+        return;
+      }
+      // Imprimir: tenta abrir nova aba; se bloqueado, baixa
+      pdf.autoPrint();
+      const blobUrl = URL.createObjectURL(pdf.output("blob"));
+      const win = window.open(blobUrl, "_blank");
+      if (!win || win.closed) {
+        pdf.save(fileName);
+        toast.info("Pop-up bloqueado. PDF baixado — abra para imprimir.");
+        return;
+      }
+      toast.success("Prévia do recibo aberta para impressão.");
+    } catch (err: any) {
+      console.error("Erro ao gerar recibo:", err);
+      toast.error("Erro ao gerar recibo: " + (err?.message || "tente novamente"));
     }
-    const blobUrl = URL.createObjectURL(pdf.output("blob"));
-    window.open(blobUrl, "_blank", "noopener,noreferrer");
-    toast.success("Prévia do recibo aberta para impressão.");
   };
 
   return (

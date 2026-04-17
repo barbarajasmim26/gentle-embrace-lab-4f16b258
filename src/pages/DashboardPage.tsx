@@ -8,6 +8,7 @@ import {
   TrendingUp, Clock, Plus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { differenceInDays, parseISO, isToday } from "date-fns";
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -23,6 +24,16 @@ export default function DashboardPage() {
     if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
     return (t.payment_day || 10) < now.getDate();
   }) || [];
+
+  // Conta alertas reais (vencidos + vencendo em 30 dias) — mesma lógica da página de Alertas
+  const activeOnly = (tenants || []).filter((t) => t.status === "active");
+  const expired = activeOnly.filter((t) => t.exit_date && parseISO(t.exit_date) < now && !isToday(parseISO(t.exit_date)));
+  const expiringSoon = activeOnly.filter((t) => {
+    if (!t.exit_date) return false;
+    const d = differenceInDays(parseISO(t.exit_date), now);
+    return d >= 0 && d <= 30;
+  });
+  const alertsCount = expired.length + expiringSoon.length;
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
@@ -76,7 +87,7 @@ export default function DashboardPage() {
       desc: "Contratos vencendo e vencidos",
       icon: Bell,
       iconBg: "bg-destructive",
-      badge: `${overdue.length} avisos`,
+      badge: `${alertsCount} avisos`,
       badgeColor: "bg-destructive/10 text-destructive",
       url: "/alerts",
     },
