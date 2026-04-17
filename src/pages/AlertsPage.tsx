@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTenants, useUpdateTenant, useAllPayments } from "@/hooks/use-tenants";
+import { useTenants, useUpdateTenant } from "@/hooks/use-tenants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,6 @@ import { toast } from "sonner";
 
 export default function AlertsPage() {
   const { data: activeTenants } = useTenants("active");
-  const { data: formerTenants } = useTenants("former");
   const updateTenant = useUpdateTenant();
   const navigate = useNavigate();
   const today = new Date();
@@ -22,15 +21,15 @@ export default function AlertsPage() {
   const [renewTenant, setRenewTenant] = useState<any>(null);
   const [renewForm, setRenewForm] = useState({ entry_date: "", exit_date: "" });
 
-  // Apenas inquilinos ATIVOS devem aparecer em alertas (ex-inquilinos não)
-  const expiredContracts = (activeTenants || []).filter((t) => t.exit_date && parseISO(t.exit_date) < today && !isToday(parseISO(t.exit_date)));
-  const expiringSoon = (activeTenants || []).filter((t) => {
+  const activeOnly = (activeTenants || []).filter((t) => t.status === "active");
+  const expiredContracts = activeOnly.filter((t) => t.exit_date && parseISO(t.exit_date) < today && !isToday(parseISO(t.exit_date)));
+  const expiringSoon = activeOnly.filter((t) => {
     if (!t.exit_date) return false;
     const d = differenceInDays(parseISO(t.exit_date), today);
     return d >= 0 && d <= 30;
   });
-  const noPhone = (activeTenants || []).filter((t) => !t.phone);
-  const noContractDates = (activeTenants || []).filter((t) => !t.entry_date || !t.exit_date);
+  const noPhone = activeOnly.filter((t) => !t.phone);
+  const noContractDates = activeOnly.filter((t) => !t.entry_date || !t.exit_date);
 
   const openRenew = (tenant: any, e?: React.MouseEvent) => {
     e?.stopPropagation();
