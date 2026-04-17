@@ -73,10 +73,11 @@ export default function OverduePage() {
   };
 
   const openPayDialog = (t: any) => {
+    const { lateFee, interest } = resolveFees(t, settings);
     setPayTenant(t);
     setPayStatus("paid_late");
-    setPayLateFee("10");
-    setPayInterest("1");
+    setPayLateFee(String(lateFee));
+    setPayInterest(String(interest));
     setPayCustomAmount("");
     setPayDate(new Date().toISOString().split("T")[0]);
     setPayDialogOpen(true);
