@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { isOverdue as checkOverdue, isPaymentPaid } from "@/lib/payment-status";
 
 import TenantCreateDialog from "@/components/tenants/TenantCreateDialog";
 import TenantCard from "@/components/tenants/TenantCard";
@@ -28,6 +29,7 @@ export default function TenantsPage() {
 
   const now = new Date();
   const month = now.getMonth() + 1;
+  const year = now.getFullYear();
 
   const filtered = tenants?.filter((t) => {
     const q = search.toLowerCase();
@@ -53,31 +55,41 @@ export default function TenantsPage() {
   };
 
   const getPaymentPattern = (tenantId: string) => {
+    const tenant = tenants?.find((t) => t.id === tenantId);
+    if (!tenant) return null;
+
+    // Se o usuário definiu um status manual de comportamento
+    if (tenant.status === "irregular") {
+      return { label: "Irregular - Pagamento instável", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
+    }
+
     if (!allPayments) return null;
     const recentPayments: boolean[] = [];
     for (let m = month - 1; m >= Math.max(1, month - 6); m--) {
       const p = allPayments.find((pay: any) => pay.tenant_id === tenantId && pay.month === m);
-      recentPayments.push(p?.status === "paid" || p?.status === "paid_late");
+      recentPayments.push(isPaymentPaid(p?.status));
     }
     const paidCount = recentPayments.filter(Boolean).length;
     const total = recentPayments.length;
     if (total === 0) return null;
     const ratio = paidCount / total;
-    if (ratio >= 0.8) return { label: "Paga e mora", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30" };
-    if (ratio <= 0.3) return { label: "Mora e paga", icon: TrendingDown, colorClass: "bg-destructive/10 text-destructive border-destructive/30" };
+    
+    if (ratio >= 0.8) return { label: "Bom pagador", icon: TrendingUp, colorClass: "bg-success/10 text-success border-success/30" };
+    if (ratio <= 0.3) return { label: "Inadimplente", icon: AlertTriangle, colorClass: "bg-destructive/10 text-destructive border-destructive/30" };
     return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
   };
 
   const isOverdue = (tenantId: string) => {
-    const payment = allPayments?.find((p: any) => p.tenant_id === tenantId && p.month === month);
     const tenant = tenants?.find((t) => t.id === tenantId);
-    if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
-    return (tenant?.payment_day || 10) < now.getDate();
+    if (!tenant) return false;
+    const payment = allPayments?.find((p: any) => p.tenant_id === tenantId && p.month === month);
+    if (isPaymentPaid(payment?.status) || payment?.status === "deposit") return false;
+    return checkOverdue(month, year, tenant.payment_day || 10, tenant.payment_cycle, now);
   };
 
   const isPaid = (tenantId: string) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === tenantId && p.month === month);
-    return payment?.status === "paid" || payment?.status === "paid_late";
+    return isPaymentPaid(payment?.status);
   };
 
   return (

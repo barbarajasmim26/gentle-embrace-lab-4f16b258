@@ -10,7 +10,7 @@ import { AlertTriangle, MessageCircle, Eye, CheckCircle2, Clock, DollarSign, Hom
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
-import { isOverdue } from "@/lib/payment-status";
+import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
 
 export default function OverduePage() {
   const now = new Date();
@@ -31,7 +31,7 @@ export default function OverduePage() {
 
   const overdue = tenants?.filter((t) => {
     const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-    if (payment?.status === "paid" || payment?.status === "paid_late" || payment?.status === "deposit") return false;
+    if (isPaymentPaid(payment?.status) || payment?.status === "deposit") return false;
     return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
   }) || [];
 
@@ -142,7 +142,6 @@ export default function OverduePage() {
           {overdue.map((t) => {
             const rent = Number(t.rent_amount);
             const { fee, interest, total } = calcFees(rent);
-            const daysLate = now.getDate() - (t.payment_day || 10);
             return (
               <Card key={t.id} className="rounded-2xl hover:shadow-lg transition-all">
                 <CardContent className="py-5 px-5">

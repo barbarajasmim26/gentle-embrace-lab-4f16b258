@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle, Home, TrendingUp, Clock, ChevronRight as ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle, Home, TrendingUp, Clock, ChevronRight as ArrowRight, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { isPaymentPaid } from "@/lib/payment-status";
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -39,24 +40,13 @@ export default function CalendarPage() {
     const month = currentMonth + 1;
     const paidTenants = dueTenants.filter((t) => {
       const p = payments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-      return p?.status === "paid" || p?.status === "paid_late";
+      return isPaymentPaid(p?.status);
     });
     const pendingTenants = dueTenants.filter((t) => {
       const p = payments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-      return !p || (p.status !== "paid" && p.status !== "paid_late");
+      return !p || !isPaymentPaid(p.status);
     });
-    const contractEvents = tenants?.filter((t) => {
-      if (t.entry_date) {
-        const d = new Date(t.entry_date);
-        if (d.getDate() === day && d.getMonth() === currentMonth && d.getFullYear() === currentYear) return true;
-      }
-      if (t.exit_date) {
-        const d = new Date(t.exit_date);
-        if (d.getDate() === day && d.getMonth() === currentMonth && d.getFullYear() === currentYear) return true;
-      }
-      return false;
-    }) || [];
-    return { dueTenants, paidTenants, pendingTenants, contractEvents };
+    return { dueTenants, paidTenants, pendingTenants };
   };
 
   const monthlySummary = useMemo(() => {
@@ -65,7 +55,7 @@ export default function CalendarPage() {
     let totalPaid = 0, totalPending = 0, paidCount = 0, pendingCount = 0;
     tenants.forEach((t) => {
       const p = payments.find((p: any) => p.tenant_id === t.id && p.month === month);
-      if (p?.status === "paid" || p?.status === "paid_late") {
+      if (isPaymentPaid(p?.status)) {
         totalPaid += Number(p.amount || t.rent_amount);
         paidCount++;
       } else {
@@ -80,12 +70,12 @@ export default function CalendarPage() {
   const upcomingDue = useMemo(() => {
     if (!tenants) return [];
     const startDay = isCurrentMonth ? today.getDate() : 1;
-    const results: { day: number; tenant: typeof tenants[0] }[] = [];
+    const results: { day: number; tenant: any }[] = [];
     tenants.forEach((t) => {
       if (t.payment_day && t.payment_day >= startDay && t.payment_day <= daysInMonth) {
         const month = currentMonth + 1;
         const p = payments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-        if (!p || (p.status !== "paid" && p.status !== "paid_late")) {
+        if (!p || !isPaymentPaid(p.status)) {
           results.push({ day: t.payment_day, tenant: t });
         }
       }
@@ -123,7 +113,7 @@ export default function CalendarPage() {
               <h2 className="text-lg font-bold">{MONTHS_PT[currentMonth]} {currentYear}</h2>
               <div className="flex items-center gap-4 text-xs">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Pago</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block" /> Pendente</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" /> Pendente</span>
               </div>
             </div>
 
@@ -141,7 +131,7 @@ export default function CalendarPage() {
                 const day = i + 1;
                 const info = getDayInfo(day);
                 const isToday = day === today.getDate() && isCurrentMonth;
-                const hasEvents = info.dueTenants.length > 0 || info.contractEvents.length > 0;
+                const hasEvents = info.dueTenants.length > 0;
                 const totalEvents = info.dueTenants.length;
 
                 return (
@@ -170,8 +160,8 @@ export default function CalendarPage() {
                       ))}
                       {info.pendingTenants.slice(0, 3 - info.paidTenants.slice(0, 3).length).map((t) => (
                         <div key={t.id} className="flex items-center gap-1 text-[10px] leading-tight truncate">
-                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                          <span className="text-orange-600 font-medium truncate">{t.name.split(" ")[0]}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
+                          <span className="text-destructive font-medium truncate">{t.name.split(" ")[0]}</span>
                           <span className="text-muted-foreground truncate">C{t.house_number}</span>
                         </div>
                       ))}
@@ -204,7 +194,7 @@ export default function CalendarPage() {
                 </div>
                 <div className="bg-white/15 rounded-xl p-3">
                   <p className="text-[11px] uppercase tracking-wider opacity-70">Pendente</p>
-                  <p className="font-bold text-lg text-orange-200">{monthlySummary.pendingCount} contr.</p>
+                  <p className="font-bold text-lg text-destructive-foreground">{monthlySummary.pendingCount} contr.</p>
                 </div>
               </div>
             </CardContent>
@@ -224,17 +214,17 @@ export default function CalendarPage() {
                   {upcomingDue.map(({ day, tenant: t }) => (
                     <div
                       key={t.id}
-                      className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
+                      className="flex items-center gap-3 py-2.5 px-2 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
                       onClick={() => navigate(`/tenants/${t.id}`)}
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted font-bold text-xs">
                         {day}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{t.name.split(" ").slice(0, 2).join(" ")}</p>
-                        <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{t.name}</p>
+                        <p className="text-[10px] text-muted-foreground">R$ {Number(t.rent_amount).toFixed(2)} · Casa {t.house_number}</p>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <ArrowRight className="h-4 w-4 ml-auto text-muted-foreground/30" />
                     </div>
                   ))}
                 </div>
@@ -244,74 +234,48 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Day Detail Dialog */}
-      <Dialog open={!!selectedDay} onOpenChange={() => setSelectedDay(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+      {/* Day Details Dialog */}
+      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
-              {selectedDay} de {MONTHS_PT[currentMonth]} de {currentYear}
+              Vencimentos do Dia {selectedDay}
             </DialogTitle>
           </DialogHeader>
-          {selectedInfo && (
-            <ScrollArea className="flex-1 overflow-auto pr-3" style={{ maxHeight: "calc(85vh - 120px)" }}>
-              <div className="space-y-4">
-                {selectedInfo.paidTenants.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5 mb-2">
-                      <CheckCircle2 className="h-4 w-4" /> Pagos ({selectedInfo.paidTenants.length})
-                    </h3>
-                    {selectedInfo.paidTenants.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 mb-1 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
-                        <div>
-                          <span className="text-sm font-medium">{t.name}</span>
-                          <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-emerald-600">R$ {Number(t.rent_amount).toFixed(2)}</span>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-3 pt-2">
+              {selectedInfo?.dueTenants.map((t) => {
+                const isPaid = selectedInfo.paidTenants.some(p => p.id === t.id);
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 rounded-xl border bg-card hover:shadow-sm transition-all cursor-pointer"
+                    onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 flex items-center justify-center rounded-full font-bold text-xs ${isPaid ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
+                        {t.name.charAt(0)}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {selectedInfo.pendingTenants.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-orange-500 flex items-center gap-1.5 mb-2">
-                      <AlertTriangle className="h-4 w-4" /> Pendentes ({selectedInfo.pendingTenants.length})
-                    </h3>
-                    {selectedInfo.pendingTenants.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-orange-50 dark:bg-orange-500/10 mb-1 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
-                        <div>
-                          <span className="text-sm font-medium">{t.name}</span>
-                          <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-orange-500">R$ {Number(t.rent_amount).toFixed(2)}</span>
+                      <div>
+                        <p className="font-semibold text-sm">{t.name}</p>
+                        <p className="text-xs text-muted-foreground">Casa {t.house_number} · R$ {Number(t.rent_amount).toFixed(2)}</p>
                       </div>
-                    ))}
+                    </div>
+                    {isPaid ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
+                        <CheckCircle2 className="h-3 w-3 mr-1" /> Pago
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">
+                        <XCircle className="h-3 w-3 mr-1" /> Pendente
+                      </Badge>
+                    )}
                   </div>
-                )}
-                {selectedInfo.contractEvents.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-warning flex items-center gap-1.5 mb-2">
-                      <Home className="h-4 w-4" /> Contratos
-                    </h3>
-                    {selectedInfo.contractEvents.map((t) => {
-                      const isEntry = t.entry_date && new Date(t.entry_date).getDate() === selectedDay;
-                      return (
-                        <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-warning/5 mb-1 cursor-pointer hover:bg-warning/10 transition-colors" onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}>
-                          <div>
-                            <span className="text-sm font-medium">{t.name}</span>
-                            <p className="text-[11px] text-muted-foreground">Casa {t.house_number}</p>
-                          </div>
-                          <Badge variant="outline" className={`text-[10px] ${isEntry ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                            {isEntry ? "📥 Entrada" : "📤 Saída"}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          )}
+                );
+              })}
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>

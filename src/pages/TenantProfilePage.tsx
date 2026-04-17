@@ -16,7 +16,7 @@ import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whats
 import { generateReceipt } from "@/lib/receipt-generator";
 import { extractSupabaseStoragePath, isAbsoluteHttpUrl } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
-import { isOverdue, PAYMENT_CYCLE_LABELS } from "@/lib/payment-status";
+import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -60,9 +60,6 @@ export default function TenantProfilePage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailMonth, setDetailMonth] = useState(0);
 
-  // Single click timeout ref (must be before early returns)
-  
-
   const now = new Date();
   const month = now.getMonth() + 1;
 
@@ -76,13 +73,23 @@ export default function TenantProfilePage() {
   const rentAmount = Number(tenant.rent_amount);
 
   // Summary stats
-  const totalPaidYear = payments?.filter((p) => p.status === "paid" || p.status === "paid_late").reduce((sum, p) => sum + Number(p.amount || rentAmount), 0) || 0;
-  const totalPendingYear = payments?.filter((p) => p.status === "pending").length || 0;
-  const paidMonths = payments?.filter((p) => p.status === "paid" || p.status === "paid_late").length || 0;
-  const lastPayment = payments?.filter((p) => p.status === "paid" || p.status === "paid_late").sort((a, b) => (b.paid_at || "").localeCompare(a.paid_at || ""))[0];
+  const totalPaidYear = payments?.filter((p) => isPaymentPaid(p.status)).reduce((sum, p) => sum + Number(p.amount || rentAmount), 0) || 0;
+  
+  // Meses pendentes: conta apenas meses que já deveriam ter sido pagos e não estão marcados como pagos
+  const totalPendingYear = Array.from({ length: month }).filter(m => {
+    const mNum = m + 1;
+    const p = payments?.find(pay => pay.month === mNum);
+    if (isPaymentPaid(p?.status) || p?.status === "deposit") return false;
+    return isOverdue(mNum, year, tenant.payment_day || 10, tenant.payment_cycle, now);
+  }).length;
+
+  const paidMonths = payments?.filter((p) => isPaymentPaid(p.status)).length || 0;
+  const lastPayment = payments?.filter((p) => isPaymentPaid(p.status)).sort((a, b) => (b.paid_at || "").localeCompare(a.paid_at || ""))[0];
 
   // Payment pattern
   const getPaymentPattern = () => {
+    if (tenant.status === "irregular") return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30", desc: "Pagamento instável" };
+    
     if (!allPayments) return null;
     const recentPayments: string[] = [];
     for (let m = month - 1; m >= Math.max(1, month - 6); m--) {
@@ -111,7 +118,6 @@ export default function TenantProfilePage() {
     return "pending";
   };
 
-  // Calculate late fee amount
   const calcFinalAmount = () => {
     const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
     if (payStatus === "paid" || payStatus === "pending" || payStatus === "deposit") return base;
@@ -123,8 +129,6 @@ export default function TenantProfilePage() {
   const handlePaymentClick = (m: number) => {
     const existing = getPayment(m);
     const currentStatus = existing?.status || "pending";
-
-    // Always open dialog with all status options
     setPayMonth(m);
     setPayStatus(currentStatus === "pending" ? "paid" : currentStatus as PaymentStatusType);
     setPayLateFee("10");
@@ -163,6 +167,7 @@ export default function TenantProfilePage() {
       entry_date: tenant.entry_date || "", exit_date: tenant.exit_date || "", cpf: tenant.cpf || "",
       property_id: tenant.property_id || "", notes: tenant.notes || "",
       payment_cycle: tenant.payment_cycle || "postecipado",
+      status: tenant.status || "active",
     });
     setEditOpen(true);
   };
@@ -178,6 +183,7 @@ export default function TenantProfilePage() {
         cpf: editForm.cpf || null, property_id: editForm.property_id || null,
         notes: editForm.notes || null,
         payment_cycle: editForm.payment_cycle || "postecipado",
+        status: editForm.status || "active",
       });
       toast.success("Salvo!");
       setEditOpen(false);
@@ -206,300 +212,176 @@ export default function TenantProfilePage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const sendWhatsApp = () => {
-    if (!tenant.phone) { toast.error("Telefone não cadastrado."); return; }
-    const templates = getMessageTemplates({
-      name: tenant.name, amount: rentAmount,
-      month: month, year: currentYear,
-      property: tenant.property?.address || "", houseNumber: tenant.house_number || "",
-      dueDay: tenant.payment_day || 10,
-    });
-    openWhatsApp({ phone: tenant.phone, message: templates.reminder });
-  };
-
-  const sendOverdueWhatsApp = () => {
-    if (!tenant.phone) { toast.error("Telefone não cadastrado."); return; }
-    const fee = rentAmount * 0.10;
-    const interest = rentAmount * 0.01;
-    const total = rentAmount + fee + interest;
-    const templates = getMessageTemplates({
-      name: tenant.name, amount: rentAmount,
-      month, year: currentYear,
-      property: tenant.property?.address || "", houseNumber: tenant.house_number || "",
-      dueDay: tenant.payment_day || 10,
-      lateFee: 10, interest: 1, totalWithFees: total,
-    });
-    openWhatsApp({ phone: tenant.phone, message: templates.overdue });
-  };
-
-  const openWhatsAppDirect = () => {
-    if (!tenant.phone) { toast.error("Telefone não cadastrado."); return; }
-    openWhatsAppChat(tenant.phone);
-  };
-
-  const handleReceipt = async (m: number) => {
-    const payment = getPayment(m);
-    const isDeposit = payment?.status === "deposit";
-    const doc = await generateReceipt({
+  const handleReceipt = (m: number) => {
+    const p = getPayment(m);
+    if (!p) return;
+    generateReceipt({
       tenantName: tenant.name,
-      cpf: tenant.cpf || undefined,
-      address: tenant.property?.address || "",
-      houseNumber: tenant.house_number || undefined,
-      amount: Number(payment?.amount || rentAmount),
-      month: m, year,
-      paymentDate: payment?.paid_at || new Date().toISOString().split("T")[0],
-      paymentMethod: "Pix",
-      paymentType: isDeposit ? "caução" : "aluguel",
-      receiptNumber: `REC-${year}-${String(m).padStart(2, "0")}-${tenant.id.slice(0, 6).toUpperCase()}`,
-      signatureName: "LOCADOR",
+      amount: Number(p.amount || rentAmount),
+      month: m,
+      year: year,
+      propertyAddress: tenant.property?.address || "",
+      houseNumber: tenant.house_number || "",
+      paymentDate: p.paid_at || new Date().toISOString().split("T")[0],
     });
-    doc.save(`recibo_${tenant.name}_${isDeposit ? "caucao" : m}_${year}.pdf`);
-    toast.success(`Recibo de ${isDeposit ? "caução" : "pagamento"} gerado!`);
-  };
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const path = `${id}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from("contracts").upload(path, file);
-    if (error) { toast.error("Erro ao enviar arquivo."); return; }
-    await supabase.from("documents").insert({ tenant_id: id!, file_name: file.name, file_url: path, file_type: "contract" });
-    toast.success("Contrato enviado!");
-    refetchDocs();
-  };
-
-  const downloadDocument = async (doc: any) => {
-    const storagePath = extractSupabaseStoragePath(doc.file_url || "");
-    if (storagePath) {
-      const { data, error } = await supabase.storage.from("contracts").createSignedUrl(storagePath, 3600);
-      if (data?.signedUrl) { window.open(data.signedUrl, "_blank", "noopener,noreferrer"); return; }
-      if (error) console.error("Erro ao gerar URL assinada:", error);
-    }
-    if (isAbsoluteHttpUrl(doc.file_url || "")) { window.open(doc.file_url, "_blank", "noopener,noreferrer"); return; }
-    toast.error("Erro ao abrir documento.");
   };
 
   const detailPayment = getPayment(detailMonth);
-  const detailConfig = STATUS_CONFIG[detailPayment?.status || "pending"];
+  const detailConfig = detailPayment ? STATUS_CONFIG[detailPayment.status] || STATUS_CONFIG.pending : STATUS_CONFIG.pending;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="rounded-lg">
-        <ArrowLeft className="mr-2 h-4 w-4" />Voltar
-      </Button>
+    <div className="space-y-6 animate-fade-in pb-10">
+      {/* Header & Quick Actions */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/tenants")} className="rounded-xl hover:bg-muted/50">
+            <ArrowLeft className="mr-1 h-4 w-4" />Voltar
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="rounded-xl border-primary/20 hover:bg-primary/5" onClick={handleEdit}>
+              <Edit className="mr-1 h-4 w-4" />Editar
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5" onClick={moveToFormer}>
+              <UserX className="mr-1 h-4 w-4" />Finalizar
+            </Button>
+          </div>
+        </div>
 
-      {/* Profile Header */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary font-bold text-xl">
-                {tenant.name.charAt(0)}
-              </div>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight">{tenant.name}</h1>
-                <p className="text-sm text-muted-foreground">{tenant.property?.address} - Casa {tenant.house_number}</p>
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  <Badge variant={tenant.status === "active" ? "default" : "secondary"} className="rounded-lg">
-                    {tenant.status === "active" ? "✓ Ativo" : "Encerrado"}
-                  </Badge>
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-2xl font-bold shadow-lg shadow-primary/20">
+            {tenant.name.charAt(0)}
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">{tenant.name}</h1>
+            <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg text-xs">
+                <MapPin className="h-3.5 w-3.5" />{tenant.property?.name || tenant.property?.address} · Casa {tenant.house_number}
+              </span>
+              {tenant.phone && (
+                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg text-xs">
+                  <Phone className="h-3.5 w-3.5" />{tenant.phone}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="rounded-2xl border-0 bg-primary/5 shadow-none">
+              <CardContent className="p-4 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Total Pago {year}</p>
+                <p className="text-lg font-bold text-primary">R$ {totalPaidYear.toLocaleString("pt-BR")}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-2xl border-0 bg-destructive/5 shadow-none">
+              <CardContent className="p-4 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Meses pendentes</p>
+                <p className="text-lg font-bold text-destructive">{totalPendingYear}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-2xl border-0 bg-success/5 shadow-none">
+              <CardContent className="p-4 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Meses pagos</p>
+                <p className="text-lg font-bold text-success">{paidMonths}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-2xl border-0 bg-accent/5 shadow-none">
+              <CardContent className="p-4 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Status</p>
+                <div className="flex justify-center mt-1">
                   {pattern && (
-                    <Badge variant="outline" className={`rounded-lg ${pattern.colorClass}`}>
+                    <Badge variant="outline" className={`text-[10px] ${pattern.colorClass}`}>
                       <pattern.icon className="h-3 w-3 mr-1" />{pattern.label}
                     </Badge>
                   )}
                 </div>
-                {pattern?.desc && <p className="text-xs text-muted-foreground mt-1 italic">{pattern.desc}</p>}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleEdit} className="rounded-lg"><Edit className="mr-1 h-4 w-4" />Editar</Button>
-              <Button variant="outline" size="sm" onClick={openNotesDialog} className="rounded-lg"><StickyNote className="mr-1 h-4 w-4" />OBS</Button>
-              <Button variant="outline" size="sm" onClick={sendWhatsApp} className="rounded-lg"><MessageCircle className="mr-1 h-4 w-4" />Lembrete</Button>
-              <Button variant="outline" size="sm" onClick={sendOverdueWhatsApp} className="rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10"><MessageCircle className="mr-1 h-4 w-4" />Cobrar</Button>
-              {tenant.phone && (
-                <Button variant="outline" size="sm" onClick={openWhatsAppDirect} className="rounded-lg"><Phone className="mr-1 h-4 w-4" />Chat</Button>
-              )}
-              <Button variant="outline" size="sm" onClick={moveToFormer} className="rounded-lg text-destructive hover:bg-destructive/10"><UserX className="mr-1 h-4 w-4" />Ex-inquilino</Button>
-              <label>
-                <Button variant="outline" size="sm" asChild className="rounded-lg"><span><Upload className="mr-1 h-4 w-4" />Contrato</span></Button>
-                <input type="file" accept=".pdf,.jpg,.png,.doc,.docx" className="hidden" onChange={handleUpload} />
-              </label>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="border-success/20">
-          <CardContent className="pt-4 pb-3 text-center">
-            <DollarSign className="h-5 w-5 mx-auto mb-1 text-success" />
-            <p className="text-lg font-bold text-success">R$ {totalPaidYear.toFixed(2)}</p>
-            <p className="text-[10px] text-muted-foreground">Pago em {year}</p>
-          </CardContent>
-        </Card>
-        <Card className={totalPendingYear > 0 ? "border-destructive/20" : ""}>
-          <CardContent className="pt-4 pb-3 text-center">
-            <AlertTriangle className={`h-5 w-5 mx-auto mb-1 ${totalPendingYear > 0 ? "text-destructive" : "text-muted-foreground"}`} />
-            <p className="text-lg font-bold">{totalPendingYear}</p>
-            <p className="text-[10px] text-muted-foreground">Meses pendentes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 text-center">
-            <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-primary" />
-            <p className="text-lg font-bold">{paidMonths}/{12}</p>
-            <p className="text-[10px] text-muted-foreground">Meses pagos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3 text-center">
-            <Calendar className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-sm font-bold">{lastPayment?.paid_at ? new Date(lastPayment.paid_at + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</p>
-            <p className="text-[10px] text-muted-foreground">Último pagamento</p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Payment Calendar */}
+          <Card className="rounded-2xl overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />Pagamentos {year}
+              </CardTitle>
+              <div className="flex items-center gap-1 border rounded-lg p-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setYear(year - 1)}><ArrowLeft className="h-3 w-3" /></Button>
+                <span className="text-xs font-bold px-2">{year}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setYear(year + 1)} disabled={year >= currentYear}><Edit className="h-3 w-3 rotate-180" /></Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {MONTHS.map((m, i) => {
+                  const mNum = i + 1;
+                  const status = getPaymentStatus(mNum);
+                  const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+                  const isCurrent = year === currentYear && mNum === month;
 
-      {/* Info Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { icon: DollarSign, label: "Aluguel", value: `R$ ${rentAmount.toFixed(2)}`, colorClass: "text-success" },
-          { icon: DollarSign, label: "Caução", value: `R$ ${Number(tenant.deposit || 0).toFixed(2)}`, colorClass: "text-primary" },
-          { icon: Calendar, label: "Vencimento", value: `Dia ${tenant.payment_day}`, colorClass: "text-primary" },
-          { icon: Clock, label: "Ciclo", value: tenant.payment_cycle === "antecipado" ? "Paga e mora" : "Mora e paga", colorClass: "text-accent" },
-          { icon: Calendar, label: "Entrada", value: tenant.entry_date ? new Date(tenant.entry_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
-          { icon: Calendar, label: "Saída", value: tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—", colorClass: "text-muted-foreground" },
-          { icon: User, label: "CPF", value: tenant.cpf || "—", colorClass: "text-muted-foreground" },
-        ].map((item, i) => (
-          <Card key={i}>
-            <CardContent className="pt-4 pb-3 text-center">
-              <item.icon className={`h-4 w-4 mx-auto mb-1 ${item.colorClass}`} />
-              <p className="text-xs text-muted-foreground">{item.label}</p>
-              <p className="text-sm font-semibold mt-0.5">{item.value}</p>
+                  return (
+                    <div
+                      key={m}
+                      onClick={() => handlePaymentClick(mNum)}
+                      onDoubleClick={() => openPayDetail(mNum)}
+                      className={`group relative flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none hover:shadow-md ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : ""} ${config.colorClass}`}
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-2">{m}</span>
+                      <config.icon className="h-5 w-5 mb-2" />
+                      <span className="text-[10px] font-semibold">{config.label}</span>
+                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Edit className="h-2.5 w-2.5" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6 p-4 rounded-xl bg-muted/30 border border-dashed flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold">Dica de Gestão</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">Clique em um mês para registrar pagamento. Clique duas vezes para ver detalhes e gerar recibo.</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        ))}
+        </div>
+
+        <div className="space-y-6">
+          {/* Info Card */}
+          <Card className="rounded-2xl">
+            <CardHeader><CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Informações Gerais</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {[
+                  { icon: DollarSign, label: "Aluguel", value: `R$ ${rentAmount.toFixed(2)}`, colorClass: "text-emerald-600" },
+                  { icon: DollarSign, label: "Caução", value: tenant.deposit ? `R$ ${Number(tenant.deposit).toFixed(2)}` : "Não informado", colorClass: "text-primary" },
+                  { icon: Calendar, label: "Dia de Pagamento", value: `Todo dia ${tenant.payment_day}`, colorClass: "text-blue-600" },
+                  { icon: Clock, label: "Ciclo", value: tenant.payment_cycle === "antecipado" ? "Paga e mora" : "Mora e paga", colorClass: "text-accent" },
+                  { icon: User, label: "CPF", value: tenant.cpf || "Não informado", colorClass: "text-muted-foreground" },
+                  { icon: MapPin, label: "Entrada", value: tenant.entry_date ? new Date(tenant.entry_date + "T12:00:00").toLocaleDateString("pt-BR") : "Não informada", colorClass: "text-muted-foreground" },
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-muted last:border-0">
+                    <span className="flex items-center gap-2 text-muted-foreground"><item.icon className="h-4 w-4" />{item.label}</span>
+                    <span className={`font-semibold ${item.colorClass}`}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={openNotesDialog}>
+                <StickyNote className="h-4 w-4" />Observações
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Phone & Property */}
-      {(tenant.phone || tenant.property) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {tenant.phone && (
-            <Card className="cursor-pointer hover:shadow-md transition-all" onClick={openWhatsAppDirect}>
-              <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10 text-success"><Phone className="h-5 w-5" /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Telefone / WhatsApp</p>
-                  <p className="text-sm font-semibold text-primary">{tenant.phone} <ExternalLink className="inline h-3 w-3" /></p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {tenant.property && (
-            <Card>
-              <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Condomínio</p>
-                  <p className="text-sm font-semibold">{tenant.property.name || tenant.property.address}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Notes */}
-      {tenant.notes && (
-        <Card className="border-primary/20">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0"><StickyNote className="h-4 w-4" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Observações</p>
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{tenant.notes}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Documents */}
-      {documents && documents.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2"><FileText className="h-5 w-5 text-primary" />Documentos / Contratos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">{doc.file_name}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString("pt-BR")}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => downloadDocument(doc)} className="rounded-lg"><ExternalLink className="mr-1 h-3 w-3" />Abrir</Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Payments History */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Histórico de Pagamentos</CardTitle>
-          <div className="flex gap-2 items-center">
-            <Button variant="outline" size="sm" onClick={() => setYear(year - 1)} className="rounded-lg">← {year - 1}</Button>
-            <span className="text-sm font-bold">{year}</span>
-            <Button variant="outline" size="sm" onClick={() => setYear(year + 1)} className="rounded-lg">{year + 1} →</Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
-            {MONTHS.map((m, i) => {
-              const status = getPaymentStatus(i + 1);
-              const payment = getPayment(i + 1);
-              const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-              const StatusIcon = config.icon;
-              const isPaid = status === "paid" || status === "paid_late";
-              return (
-                <div key={m} className="text-center space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">{m}</p>
-                  <Button
-                    variant="outline" size="sm"
-                    className={`w-full text-[10px] rounded-lg ${config.colorClass} hover:opacity-80`}
-                    onClick={() => handlePaymentClick(i + 1)}
-                    title={isPaid ? "Clique para detalhes · Duplo clique para reverter" : "Clique para marcar como pago"}
-                  >
-                    <StatusIcon className="h-3 w-3 mr-0.5" />
-                    {config.label}
-                  </Button>
-                  {(isPaid || status === "deposit") && payment && (
-                    <div className="space-y-0.5">
-                      <p className="text-[9px] text-muted-foreground">
-                        R$ {Number(payment.amount || rentAmount).toFixed(2)}
-                      </p>
-                      <Button variant="ghost" size="sm" className="w-full text-[10px] p-0 h-6 rounded-lg text-primary hover:text-primary" onClick={() => handleReceipt(i + 1)}>
-                        <Download className="h-3 w-3 mr-0.5" />Recibo
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-3 text-center italic">
-            Clique no mês para alterar o status do pagamento
-          </p>
-        </CardContent>
-      </Card>
+      {/* Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -670,6 +552,16 @@ export default function TenantProfilePage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>Comportamento de Pagamento</Label>
+              <Select value={editForm.status || "active"} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Normal (Automático)</SelectItem>
+                  <SelectItem value="irregular">Irregular - Pagamento instável</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Entrada</Label><Input type="date" value={editForm.entry_date || ""} onChange={(e) => setEditForm({ ...editForm, entry_date: e.target.value })} /></div>

@@ -21,7 +21,7 @@ export function getDueDate(
   cycle: PaymentCycle = "postecipado",
 ): Date {
   const isAnticipated = cycle === "antecipado";
-  const dueMonth = isAnticipated ? refMonth - 1 : refMonth; // 0-indexed JS
+  const dueMonth = isAnticipated ? refMonth - 1 : refMonth; // 0-indexed JS: jan=0, fev=1...
   const dueYear = refYear;
   // Date com mês overflow se ajusta automaticamente (ex: dia 31 em fev)
   return new Date(dueYear, dueMonth, paymentDay);
@@ -42,4 +42,8 @@ export function isOverdue(
   // zera horas para comparar só por dia
   const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return todayMid > due;
+}
+
+export function isPaymentPaid(status: string | null | undefined): boolean {
+  return status === "paid" || status === "paid_late";
 }
