@@ -87,8 +87,8 @@ export default function TenantProfilePage() {
   const totalPaidYear = payments?.filter((p) => isPaymentPaid(p.status)).reduce((sum, p) => sum + Number(p.amount || rentAmount), 0) || 0;
   
   // Meses pendentes: conta apenas meses que já deveriam ter sido pagos e não estão marcados como pagos
-  const totalPendingYear = Array.from({ length: month }).filter(m => {
-    const mNum = m + 1;
+  const totalPendingYear = Array.from({ length: month }, (_, i) => i).filter((i) => {
+    const mNum = i + 1;
     const p = payments?.find(pay => pay.month === mNum);
     if (isPaymentPaid(p?.status) || p?.status === "deposit") return false;
     return isOverdue(mNum, year, tenant.payment_day || 10, tenant.payment_cycle, now);
@@ -217,19 +217,27 @@ export default function TenantProfilePage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleReceipt = (m: number) => {
+  const handleReceipt = async (m: number) => {
     const p = getPayment(m);
     if (!p) return;
-    generateReceipt({
-      tenantName: tenant.name,
-      amount: Number(p.amount || rentAmount),
-      paymentMethod: "PIX",
-      month: m,
-      year: year,
-      property: tenant.property,
-      houseNumber: tenant.house_number,
-      cpf: tenant.cpf,
-    });
+    try {
+      const pdf = await generateReceipt({
+        tenantName: tenant.name,
+        amount: Number(p.amount || rentAmount),
+        paymentMethod: "PIX",
+        month: m,
+        year: year,
+        address: tenant.property?.address || tenant.property?.name || "",
+        houseNumber: tenant.house_number || undefined,
+        cpf: tenant.cpf || undefined,
+        paymentDate: p.paid_at || new Date().toISOString().split("T")[0],
+      });
+      const fileName = `recibo_${tenant.name}_${MONTHS[m - 1]}_${year}.pdf`;
+      pdf.save(fileName);
+      toast.success("Recibo gerado!");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar recibo");
+    }
   };
 
   const handleUpload = async () => {

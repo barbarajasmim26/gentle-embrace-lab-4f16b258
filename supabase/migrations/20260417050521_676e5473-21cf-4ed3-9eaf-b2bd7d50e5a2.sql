@@ -1,0 +1,1 @@
+ALTER TABLE public.documents ADD COLUMN IF NOT EXISTS title TEXT, ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'contract';
