@@ -6,18 +6,22 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, RefreshCw, XCircle, Bell, Eye, ChevronRight } from "lucide-react";
+import { AlertTriangle, RefreshCw, XCircle, Bell, Eye, ChevronRight, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
 import { toast } from "sonner";
+import { generateContractPDF } from "@/lib/contract-generator";
+import { useUploadDocument } from "@/hooks/use-documents";
 
 export default function AlertsPage() {
   const { data: activeTenants } = useTenants("active");
   const updateTenant = useUpdateTenant();
+  const uploadDoc = useUploadDocument();
   const navigate = useNavigate();
   const today = new Date();
 
   const [renewOpen, setRenewOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [renewTenant, setRenewTenant] = useState<any>(null);
   const [renewForm, setRenewForm] = useState({ entry_date: "", exit_date: "" });
 
@@ -43,11 +47,50 @@ export default function AlertsPage() {
 
   const handleRenew = async () => {
     if (!renewTenant) return;
+    setIsGenerating(true);
     try {
-      await updateTenant.mutateAsync({ id: renewTenant.id, status: "active", entry_date: renewForm.entry_date, exit_date: renewForm.exit_date });
-      toast.success(`Contrato de ${renewTenant.name} renovado!`);
+      // 1. Update tenant dates
+      await updateTenant.mutateAsync({ 
+        id: renewTenant.id, 
+        status: "active", 
+        entry_date: renewForm.entry_date, 
+        exit_date: renewForm.exit_date 
+      });
+
+      // 2. Generate PDF
+      const doc = await generateContractPDF({
+        tenantName: renewTenant.name,
+        cpf: renewTenant.cpf,
+        address: renewTenant.property?.address || "Endereço não informado",
+        houseNumber: renewTenant.house_number,
+        rentAmount: Number(renewTenant.rent_amount),
+        entryDate: renewForm.entry_date,
+        exitDate: renewForm.exit_date,
+      });
+
+      // 3. Download PDF
+      const fileName = `Contrato_Renovado_${renewTenant.name.replace(/\s+/g, "_")}.pdf`;
+      doc.save(fileName);
+
+      // 4. Upload to Supabase
+      const pdfBlob = doc.output("blob");
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+      
+      await uploadDoc.mutateAsync({
+        tenantId: renewTenant.id,
+        file: pdfFile,
+        title: `Contrato Renovado - ${new Date().getFullYear()}`,
+        category: "contract"
+      });
+
+      toast.success(`Contrato de ${renewTenant.name} renovado e baixado!`);
       setRenewOpen(false);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { 
+      console.error(e);
+      toast.error("Erro ao renovar contrato: " + e.message); 
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleNotRenew = async (tenant: any, e?: React.MouseEvent) => {
@@ -220,8 +263,22 @@ export default function AlertsPage() {
               </div>
               <div><Label>Início</Label><Input type="date" value={renewForm.entry_date} onChange={(e) => setRenewForm({ ...renewForm, entry_date: e.target.value })} /></div>
               <div><Label>Vencimento</Label><Input type="date" value={renewForm.exit_date} onChange={(e) => setRenewForm({ ...renewForm, exit_date: e.target.value })} /></div>
-              <Button className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white" onClick={handleRenew} disabled={updateTenant.isPending}>
-                {updateTenant.isPending ? "Renovando..." : "Confirmar Renovação"}
+              <Button 
+                className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2" 
+                onClick={handleRenew} 
+                disabled={updateTenant.isPending || isGenerating}
+              >
+                {updateTenant.isPending || isGenerating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    {isGenerating ? "Gerando Contrato..." : "Renovando..."}
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Confirmar e Baixar Contrato
+                  </>
+                )}
               </Button>
             </div>
           )}
