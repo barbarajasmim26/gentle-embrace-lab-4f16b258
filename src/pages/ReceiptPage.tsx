@@ -240,28 +240,27 @@ export default function ReceiptPage() {
             </div>
 
             {/* Title */}
-            <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", letterSpacing: "1px", marginBottom: "28px", textDecoration: "underline", textUnderlineOffset: "6px" }}>
+            <h2 style={{ textAlign: "center", fontSize: "15px", fontWeight: "bold", marginBottom: "28px" }}>
               RECIBO DE PAGAMENTO
             </h2>
 
-            {/* Body - always shown with placeholders */}
-            <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "2" }}>
+            {/* Body */}
+            <div style={{ textAlign: "center", marginBottom: "30px", lineHeight: "1.9" }}>
               <p>
-                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2)} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy ? ` por ${paidBy.toUpperCase()}` : ""}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE.
+                Recebi de <strong>{tenant?.name?.toUpperCase() || "____________________________"}</strong>, brasileiro(a), CPF n° {formatCPF(tenant?.cpf)}, o valor de <strong>R$ {amount.toFixed(2).replace(".", ",")} ({amountInWords(amount)})</strong> via {paymentMethod.toLowerCase()}{paidBy ? ` por ${paidBy.toUpperCase()}` : ""}, valor este referente ao {paymentType} do mês de {monthName || "__________"}, do imóvel localizado na {tenant?.property?.address || "____________________________"}, casa {tenant?.house_number || "___"} - Cascavel - CE
               </p>
             </div>
 
             {/* Date */}
-            <div style={{ textAlign: "center", margin: "35px 0 50px" }}>
+            <div style={{ textAlign: "center", margin: "40px 0 60px" }}>
               <p>{formatReceiptDate(emissionDate)}</p>
             </div>
 
             {/* Signature */}
-            <div style={{ textAlign: "center", marginTop: "20px" }}>
-              <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "220px", height: "auto", margin: "0 auto 5px" }} />
-              <div style={{ width: "280px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
-                <p style={{ margin: 0 }}>{signatureName}</p>
-                <p style={{ margin: 0, fontSize: "11px", letterSpacing: "1px" }}>LOCADORA</p>
+            <div style={{ textAlign: "center", marginTop: "30px" }}>
+              <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "150px", height: "auto", display: "block", margin: "0 auto -25px" }} />
+              <div style={{ width: "340px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
+                <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
               </div>
             </div>
           </div>
