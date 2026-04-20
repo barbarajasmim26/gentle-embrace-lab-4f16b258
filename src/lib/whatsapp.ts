@@ -3,8 +3,9 @@ export interface WhatsAppMessage {
   message?: string;
 }
 
-export function normalizeBrazilPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+export function normalizeBrazilPhone(phone: string | null | undefined) {
+  if (!phone) return "";
+  const digits = String(phone).replace(/\D/g, "");
   if (!digits) return "";
   return digits.startsWith("55") ? digits : `55${digits}`;
 }

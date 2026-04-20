@@ -235,19 +235,24 @@ export async function generateReceipt(data: ReceiptData): Promise<jsPDF> {
   doc.text(formatReceiptDate(data.paymentDate), pageWidth / 2, y, { align: "center" });
   y += 28;
 
-  // --- Signature image (overlapping the line, like original) ---
+  // --- Signature line ---
+  const lineHalfWidth = 65;
+  doc.setDrawColor(0, 0, 0);
+  doc.line(pageWidth / 2 - lineHalfWidth, y, pageWidth / 2 + lineHalfWidth, y);
+
+  // --- Signature image (centered horizontally on the line, slightly above) ---
   try {
     const signatureImg = await loadImage(signatureSrc);
-    const sigWidth = 55;
+    const sigWidth = 50;
     const sigHeight = (signatureImg.height / signatureImg.width) * sigWidth;
-    doc.addImage(signatureImg, "PNG", (pageWidth - sigWidth) / 2, y - sigHeight + 4, sigWidth, sigHeight);
+    // Center horizontally on the line and place so the bottom of the image sits ~2mm above the line
+    const sigX = (pageWidth - sigWidth) / 2;
+    const sigY = y - sigHeight + 2;
+    doc.addImage(signatureImg, "PNG", sigX, sigY, sigWidth, sigHeight);
   } catch {
     // ignore
   }
 
-  // --- Signature line ---
-  doc.setDrawColor(0, 0, 0);
-  doc.line(pageWidth / 2 - 65, y, pageWidth / 2 + 65, y);
   y += 7;
 
   // --- Signature name (single line, like original) ---

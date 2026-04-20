@@ -257,11 +257,23 @@ export default function ReceiptPage() {
             </div>
 
             {/* Signature */}
-            <div style={{ textAlign: "center", marginTop: "30px" }}>
-              <img src={signatureSrc} alt="Assinatura" style={{ maxWidth: "150px", height: "auto", display: "block", margin: "0 auto -25px" }} />
-              <div style={{ width: "340px", borderTop: "1px solid #000", margin: "0 auto", paddingTop: "8px" }}>
-                <p style={{ margin: 0 }}>{signatureName} - LOCADORA</p>
+            <div style={{ textAlign: "center", marginTop: "30px", position: "relative" }}>
+              <div style={{ width: "340px", margin: "0 auto", position: "relative", height: "60px" }}>
+                <img
+                  src={signatureSrc}
+                  alt="Assinatura"
+                  style={{
+                    maxWidth: "140px",
+                    height: "auto",
+                    position: "absolute",
+                    left: "50%",
+                    bottom: "8px",
+                    transform: "translateX(-50%)",
+                  }}
+                />
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderTop: "1px solid #000" }} />
               </div>
+              <p style={{ margin: "8px 0 0" }}>{signatureName} - LOCADORA</p>
             </div>
           </div>
         </div>
