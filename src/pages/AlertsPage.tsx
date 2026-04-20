@@ -284,34 +284,58 @@ export default function AlertsPage() {
                 <p className="font-semibold">{renewTenant.name}</p>
                 <p className="text-sm text-muted-foreground">{renewTenant.property?.address} - Casa {renewTenant.house_number}</p>
               </div>
-              <div><Label>Início</Label><Input type="date" value={renewForm.entry_date} onChange={(e) => setRenewForm({ ...renewForm, entry_date: e.target.value })} /></div>
-              <div><Label>Vencimento</Label><Input type="date" value={renewForm.exit_date} onChange={(e) => setRenewForm({ ...renewForm, exit_date: e.target.value })} /></div>
-              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
-                💡 <strong>Baixar prévia</strong>: gera o PDF com as novas datas <em>sem</em> alterar o sistema.<br />
-                ✅ <strong>Confirmar renovação</strong>: atualiza as datas, baixa o PDF final e arquiva no perfil.
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Início</Label><Input type="date" value={renewForm.entry_date} onChange={(e) => setRenewForm({ ...renewForm, entry_date: e.target.value })} /></div>
+                <div><Label>Vencimento</Label><Input type="date" value={renewForm.exit_date} onChange={(e) => setRenewForm({ ...renewForm, exit_date: e.target.value })} /></div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+                <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" /> Use o contrato original do inquilino
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  1) Baixe o contrato original abaixo &nbsp;·&nbsp; 2) Edite as datas no Word/PDF &nbsp;·&nbsp; 3) Reanexe a versão renovada
+                </p>
                 <Button
+                  type="button"
                   variant="outline"
-                  className="w-full rounded-xl gap-2"
-                  onClick={handlePreviewDownload}
-                  disabled={isPreviewing || isGenerating}
+                  size="sm"
+                  className="w-full rounded-lg gap-2"
+                  onClick={handleDownloadOriginal}
+                  disabled={!originalContract}
                 >
-                  {isPreviewing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  Baixar prévia
-                </Button>
-                <Button
-                  className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
-                  onClick={handleConfirmRenew}
-                  disabled={updateTenant.isPending || isGenerating || isPreviewing}
-                >
-                  {updateTenant.isPending || isGenerating ? (
-                    <><RefreshCw className="h-4 w-4 animate-spin" /> Renovando...</>
-                  ) : (
-                    <><RefreshCw className="h-4 w-4" /> Confirmar renovação</>
-                  )}
+                  <FileText className="h-4 w-4" />
+                  {originalContract ? `Baixar contrato original (${originalContract.file_name})` : "Nenhum contrato original no perfil"}
                 </Button>
               </div>
+
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Anexar contrato renovado (opcional)</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.doc,.docx,image/*"
+                  onChange={(e) => setRenewedFile(e.target.files?.[0] || null)}
+                />
+                {renewedFile && (
+                  <p className="text-xs text-muted-foreground">📎 {renewedFile.name}</p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
+                ✅ Ao confirmar: as novas datas serão salvas no sistema {renewedFile ? "e o contrato renovado será arquivado no perfil." : "(você pode anexar o contrato depois pelo perfil)."}
+              </div>
+
+              <Button
+                className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
+                onClick={handleConfirmRenew}
+                disabled={updateTenant.isPending || isSaving}
+              >
+                {isSaving ? (
+                  <><RefreshCw className="h-4 w-4 animate-spin" /> Renovando...</>
+                ) : (
+                  <><RefreshCw className="h-4 w-4" /> Confirmar renovação</>
+                )}
+              </Button>
             </div>
           )}
         </DialogContent>
