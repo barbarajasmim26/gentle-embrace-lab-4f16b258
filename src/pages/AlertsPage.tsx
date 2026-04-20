@@ -22,10 +22,16 @@ export default function AlertsPage() {
   const today = new Date();
 
   const [renewOpen, setRenewOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [renewTenant, setRenewTenant] = useState<any>(null);
   const [renewForm, setRenewForm] = useState({ entry_date: "", exit_date: "" });
+  const [renewedFile, setRenewedFile] = useState<File | null>(null);
+
+  // Fetch documents of the tenant being renewed (to allow downloading the original contract)
+  const { data: renewTenantDocs } = useDocuments(renewTenant?.id);
+  const originalContract = (renewTenantDocs || []).find(
+    (d: any) => (d.category || d.file_type) === "contract",
+  );
 
   const activeOnly = (activeTenants || []).filter((t) => t.status === "active");
   const expiredContracts = activeOnly.filter((t) => t.exit_date && parseISO(t.exit_date) < today && !isToday(parseISO(t.exit_date)));
@@ -40,6 +46,7 @@ export default function AlertsPage() {
   const openRenew = (tenant: any, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setRenewTenant(tenant);
+    setRenewedFile(null);
     setRenewForm({
       entry_date: new Date().toISOString().split("T")[0],
       exit_date: new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()).toISOString().split("T")[0],
@@ -47,60 +54,37 @@ export default function AlertsPage() {
     setRenewOpen(true);
   };
 
-  const buildRenewedPDF = async () => {
-    if (!renewTenant) return null;
-    return generateContractPDF({
-      tenantName: renewTenant.name,
-      cpf: renewTenant.cpf,
-      address: renewTenant.property?.address || "Endereço não informado",
-      houseNumber: renewTenant.house_number,
-      rentAmount: Number(renewTenant.rent_amount),
-      entryDate: renewForm.entry_date,
-      exitDate: renewForm.exit_date,
-    });
-  };
-
-  /** Apenas baixa o contrato com as novas datas — NÃO altera o sistema. */
-  const handlePreviewDownload = async () => {
-    if (!renewTenant) return;
-    if (!renewForm.entry_date || !renewForm.exit_date) {
-      toast.error("Preencha as datas de início e vencimento.");
+  /** Baixa o contrato ORIGINAL do inquilino para o usuário editar e depois reanexar. */
+  const handleDownloadOriginal = async () => {
+    if (!originalContract) {
+      toast.error("Nenhum contrato original encontrado no perfil deste inquilino.");
       return;
     }
-    setIsPreviewing(true);
     try {
-      const doc = await buildRenewedPDF();
-      if (!doc) return;
-      const fileName = `Contrato_Renovado_${renewTenant.name.replace(/\s+/g, "_")}_PREVIA.pdf`;
-      doc.save(fileName);
-      toast.success("Prévia baixada. Nada foi alterado no sistema.");
+      const ref = parseStorageReference(originalContract.file_url);
+      if (!ref) throw new Error("Caminho inválido do arquivo.");
+      const { data, error } = await supabase.storage
+        .from(ref.bucket)
+        .createSignedUrl(ref.path, 60, { download: originalContract.file_name });
+      if (error) throw error;
+      window.open(data.signedUrl, "_blank");
+      toast.success("Contrato original baixado. Atualize as datas e reanexe abaixo.");
     } catch (e: any) {
       console.error(e);
-      toast.error("Erro ao gerar prévia: " + e.message);
-    } finally {
-      setIsPreviewing(false);
+      toast.error("Erro ao baixar o contrato original: " + e.message);
     }
   };
 
-  /** Confirma a renovação: atualiza datas, baixa PDF final e arquiva no perfil. */
+  /** Confirma renovação: atualiza datas e (opcionalmente) anexa o contrato renovado. */
   const handleConfirmRenew = async () => {
     if (!renewTenant) return;
     if (!renewForm.entry_date || !renewForm.exit_date) {
       toast.error("Preencha as datas de início e vencimento.");
       return;
     }
-    const ok = window.confirm(
-      `Confirmar renovação de ${renewTenant.name}?\n\nNova entrada: ${new Date(renewForm.entry_date).toLocaleDateString("pt-BR")}\nNovo vencimento: ${new Date(renewForm.exit_date).toLocaleDateString("pt-BR")}\n\nO sistema será atualizado e o contrato salvo no perfil.`,
-    );
-    if (!ok) return;
 
-    setIsGenerating(true);
+    setIsSaving(true);
     try {
-      const doc = await buildRenewedPDF();
-      if (!doc) return;
-      const fileName = `Contrato_Renovado_${renewTenant.name.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`;
-      doc.save(fileName);
-
       await updateTenant.mutateAsync({
         id: renewTenant.id,
         status: "active",
@@ -108,22 +92,27 @@ export default function AlertsPage() {
         exit_date: renewForm.exit_date,
       });
 
-      const pdfBlob = doc.output("blob");
-      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-      await uploadDoc.mutateAsync({
-        tenantId: renewTenant.id,
-        file: pdfFile,
-        title: `Contrato Renovado - ${new Date().getFullYear()}`,
-        category: "contract",
-      });
+      if (renewedFile) {
+        await uploadDoc.mutateAsync({
+          tenantId: renewTenant.id,
+          file: renewedFile,
+          title: `Contrato Renovado - ${new Date().getFullYear()}`,
+          category: "contract",
+        });
+      }
 
-      toast.success(`Contrato de ${renewTenant.name} renovado com sucesso!`);
+      toast.success(
+        renewedFile
+          ? `Contrato de ${renewTenant.name} renovado e arquivado!`
+          : `Datas de ${renewTenant.name} atualizadas. Você pode anexar o contrato renovado depois pelo perfil.`,
+      );
       setRenewOpen(false);
+      setRenewedFile(null);
     } catch (e: any) {
       console.error(e);
       toast.error("Erro ao renovar contrato: " + e.message);
     } finally {
-      setIsGenerating(false);
+      setIsSaving(false);
     }
   };
 
