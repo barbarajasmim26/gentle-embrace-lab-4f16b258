@@ -63,7 +63,7 @@ export default function ReceiptPage() {
     } satisfies ReceiptData;
   }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName, paidBy]);
 
-  const handleGenerate = async (mode: "download" | "print") => {
+  const handleGenerate = async (mode: "download" | "print" | "whatsapp") => {
     if (!previewData) {
       toast.error("Selecione um inquilino para gerar o recibo.");
       return;
@@ -71,12 +71,25 @@ export default function ReceiptPage() {
     try {
       const pdf = await generateReceipt(previewData);
       const fileName = `recibo_${previewData.tenantName}_${monthName}_${year}.pdf`;
+
       if (mode === "download") {
         pdf.save(fileName);
         toast.success("Recibo em PDF gerado com sucesso.");
         return;
       }
-      // Imprimir: tenta abrir nova aba; se bloqueado, baixa
+
+      if (mode === "whatsapp") {
+        if (!tenant?.phone) {
+          toast.error("Inquilino sem telefone cadastrado.");
+          return;
+        }
+        pdf.save(fileName);
+        const message = `Olá ${tenant.name}! 😊\n\nSegue em anexo o recibo de ${paymentType} referente ao mês de ${monthName}/${year} no valor de R$ ${amount.toFixed(2).replace(".", ",")}.\n\nQualquer dúvida, estamos à disposição!`;
+        openWhatsApp({ phone: tenant.phone, message });
+        toast.success("Recibo baixado e WhatsApp aberto. Anexe o PDF na conversa.");
+        return;
+      }
+
       pdf.autoPrint();
       const blobUrl = URL.createObjectURL(pdf.output("blob"));
       const win = window.open(blobUrl, "_blank");
@@ -105,9 +118,12 @@ export default function ReceiptPage() {
             <p className="text-sm text-muted-foreground">Gere e salve recibos profissionais</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => handleGenerate("download")}>
-            <Download className="mr-2 h-4 w-4" />Salvar Perfil
+            <Download className="mr-2 h-4 w-4" />Baixar PDF
+          </Button>
+          <Button variant="outline" onClick={() => handleGenerate("whatsapp")} disabled={!tenant?.phone}>
+            <MessageCircle className="mr-2 h-4 w-4" />Enviar por WhatsApp
           </Button>
           <Button onClick={() => handleGenerate("print")}>
             <Printer className="mr-2 h-4 w-4" />Imprimir Recibo
