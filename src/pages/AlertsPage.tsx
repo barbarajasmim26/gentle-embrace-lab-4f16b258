@@ -11,7 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
 import { toast } from "sonner";
 import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
-import { getDocumentSignedUrl } from "@/lib/document-url";
+import { parseStorageReference } from "@/lib/document-url";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AlertsPage() {
   const { data: activeTenants } = useTenants("active");
