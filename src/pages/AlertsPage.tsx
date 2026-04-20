@@ -296,23 +296,32 @@ export default function AlertsPage() {
               </div>
               <div><Label>Início</Label><Input type="date" value={renewForm.entry_date} onChange={(e) => setRenewForm({ ...renewForm, entry_date: e.target.value })} /></div>
               <div><Label>Vencimento</Label><Input type="date" value={renewForm.exit_date} onChange={(e) => setRenewForm({ ...renewForm, exit_date: e.target.value })} /></div>
-              <Button 
-                className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2" 
-                onClick={handleRenew} 
-                disabled={updateTenant.isPending || isGenerating}
-              >
-                {updateTenant.isPending || isGenerating ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    {isGenerating ? "Gerando Contrato..." : "Renovando..."}
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4" />
-                    Confirmar e Baixar Contrato
-                  </>
-                )}
-              </Button>
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
+                💡 <strong>Baixar prévia</strong>: gera o PDF com as novas datas <em>sem</em> alterar o sistema.<br />
+                ✅ <strong>Confirmar renovação</strong>: atualiza as datas, baixa o PDF final e arquiva no perfil.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl gap-2"
+                  onClick={handlePreviewDownload}
+                  disabled={isPreviewing || isGenerating}
+                >
+                  {isPreviewing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Baixar prévia
+                </Button>
+                <Button
+                  className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
+                  onClick={handleConfirmRenew}
+                  disabled={updateTenant.isPending || isGenerating || isPreviewing}
+                >
+                  {updateTenant.isPending || isGenerating ? (
+                    <><RefreshCw className="h-4 w-4 animate-spin" /> Renovando...</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4" /> Confirmar renovação</>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
