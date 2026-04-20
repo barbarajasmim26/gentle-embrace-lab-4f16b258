@@ -6,12 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, RefreshCw, XCircle, Bell, Eye, ChevronRight, Download } from "lucide-react";
+import { AlertTriangle, RefreshCw, XCircle, Bell, ChevronRight, Upload, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
 import { toast } from "sonner";
-import { generateContractPDF } from "@/lib/contract-generator";
-import { useUploadDocument } from "@/hooks/use-documents";
+import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
+import { getDocumentSignedUrl } from "@/lib/document-url";
 
 export default function AlertsPage() {
   const { data: activeTenants } = useTenants("active");
