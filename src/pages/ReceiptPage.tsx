@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { amountInWords, formatReceiptDate, generateReceipt, formatCPF, type ReceiptData } from "@/lib/receipt-generator";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { toast } from "sonner";
-import { Download, Printer, Receipt } from "lucide-react";
+import { Download, Printer, Receipt, MessageCircle } from "lucide-react";
 import logoSrc from "@/assets/logo-mesquita.png";
 import signatureSrc from "@/assets/signature.png";
 
