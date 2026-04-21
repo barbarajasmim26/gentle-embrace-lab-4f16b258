@@ -269,30 +269,46 @@ export default function CalendarPage() {
             <div className="space-y-3 pt-2">
               {selectedInfo?.dueTenants.map((t) => {
                 const isPaid = selectedInfo.paidTenants.some(p => p.id === t.id);
+                const isMarking = markingId === t.id;
                 return (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between p-3 rounded-xl border bg-card hover:shadow-sm transition-all cursor-pointer"
-                    onClick={() => { setSelectedDay(null); navigate(`/tenants/${t.id}`); }}
+                    className="flex items-center justify-between gap-2 p-3 rounded-xl border bg-card hover:shadow-sm transition-all"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 flex items-center justify-center rounded-full font-bold text-xs ${isPaid ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-full font-bold text-xs ${isPaid ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
                         {t.name.charAt(0)}
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{t.name}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{t.name}</p>
                         <p className="text-xs text-muted-foreground">Casa {t.house_number} · R$ {Number(t.rent_amount).toFixed(2)}</p>
                       </div>
                     </div>
-                    {isPaid ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
-                        <CheckCircle2 className="h-3 w-3 mr-1" /> Pago
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">
-                        <XCircle className="h-3 w-3 mr-1" /> Pendente
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isPaid ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Pago
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          disabled={isMarking}
+                          onClick={(e) => { e.stopPropagation(); markAsPaid(t.id, Number(t.rent_amount)); }}
+                        >
+                          {isMarking ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3 mr-1" /> Pagar</>}
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        title="Ver perfil"
+                        onClick={(e) => { e.stopPropagation(); setSelectedDay(null); navigate(`/tenants/${t.id}`); }}
+                      >
+                        <User className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
