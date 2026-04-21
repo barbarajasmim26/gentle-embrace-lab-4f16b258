@@ -21,6 +21,27 @@ export default function CalendarPage() {
 
   const { data: tenants } = useTenants("active");
   const { data: payments } = useAllPayments(currentYear);
+  const upsertPayment = useUpsertPayment();
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const markAsPaid = async (tenantId: string, rentAmount: number) => {
+    try {
+      setMarkingId(tenantId);
+      await upsertPayment.mutateAsync({
+        tenant_id: tenantId,
+        month: currentMonth + 1,
+        year: currentYear,
+        status: "paid",
+        amount: rentAmount,
+        paid_at: new Date().toISOString().slice(0, 10),
+      });
+      toast.success("Pagamento registrado!");
+    } catch (e: any) {
+      toast.error("Erro ao marcar pagamento: " + e.message);
+    } finally {
+      setMarkingId(null);
+    }
+  };
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDay = new Date(currentYear, currentMonth, 1).getDay();
