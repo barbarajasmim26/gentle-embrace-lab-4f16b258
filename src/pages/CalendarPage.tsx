@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useTenants, useAllPayments } from "@/hooks/use-tenants";
+import { useTenants, useAllPayments, useUpsertPayment } from "@/hooks/use-tenants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle, Home, TrendingUp, Clock, ChevronRight as ArrowRight, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle, Home, TrendingUp, Clock, ChevronRight as ArrowRight, XCircle, Loader2, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { isPaymentPaid } from "@/lib/payment-status";
+import { toast } from "sonner";
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
