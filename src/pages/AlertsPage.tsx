@@ -3,16 +3,11 @@ import { useTenants, useUpdateTenant } from "@/hooks/use-tenants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { AlertTriangle, RefreshCw, XCircle, Bell, ChevronRight, Upload, FileText } from "lucide-react";
+import { AlertTriangle, RefreshCw, XCircle, Bell, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
 import { toast } from "sonner";
-import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
-import { parseStorageReference } from "@/lib/document-url";
-import { supabase } from "@/integrations/supabase/client";
+import RenewContractDialog from "@/components/contracts/RenewContractDialog";
 
 export default function AlertsPage() {
   const { data: activeTenants } = useTenants("active");
