@@ -446,7 +446,25 @@ export default function TenantProfilePage() {
                 </div>
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase">Data Saída</Label>
-                  <p className="text-sm font-medium">{tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—"}</p>
+                  {(() => {
+                    const exit = tenant.exit_date ? parseISOLocal(tenant.exit_date) : null;
+                    const days = exit ? Math.ceil((exit.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                    const isExpired = days !== null && days < 0;
+                    const isExpiring = days !== null && days >= 0 && days <= 30;
+                    return (
+                      <>
+                        <p className={`text-sm font-medium ${isExpired ? "text-destructive" : isExpiring ? "text-warning" : ""}`}>
+                          {tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—"}
+                        </p>
+                        {isExpired && (
+                          <p className="text-[10px] text-destructive font-semibold mt-0.5">⚠ Vencido há {Math.abs(days!)} dia(s)</p>
+                        )}
+                        {isExpiring && (
+                          <p className="text-[10px] text-warning font-semibold mt-0.5">Vence em {days} dia(s)</p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               {tenant.deposit && (
@@ -455,6 +473,12 @@ export default function TenantProfilePage() {
                   <p className="text-sm font-bold text-primary">R$ {Number(tenant.deposit).toFixed(2)}</p>
                 </div>
               )}
+              <Button
+                onClick={() => setRenewOpen(true)}
+                className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2 mt-2"
+              >
+                <RefreshCw className="h-4 w-4" /> Renovar contrato
+              </Button>
             </CardContent>
           </Card>
 
