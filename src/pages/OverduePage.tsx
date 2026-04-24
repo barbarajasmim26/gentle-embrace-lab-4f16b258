@@ -32,17 +32,31 @@ export default function OverduePage() {
   const [payCustomAmount, setPayCustomAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const overdue = tenants?.filter((t) => {
-    const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-    if (isPaymentPaid(payment?.status) || payment?.status === "deposit") return false;
-    return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
-  }) || [];
+  // Para cada inquilino, calcular TODOS os meses atrasados (não apenas o atual).
+  // Verifica de janeiro até o mês atual: se não pago E vencido → atrasado.
+  type OverdueItem = { tenant: any; overdueMonths: number[] };
+  const overdueList: OverdueItem[] = (tenants || [])
+    .map((t) => {
+      const months: number[] = [];
+      for (let m = 1; m <= month; m++) {
+        const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === m);
+        if (isPaymentPaid(payment?.status) || payment?.status === "deposit") continue;
+        if (isOverdue(m, year, t.payment_day || 10, t.payment_cycle, now)) {
+          months.push(m);
+        }
+      }
+      return { tenant: t, overdueMonths: months };
+    })
+    .filter((x) => x.overdueMonths.length > 0);
 
-  const getFees = (t: any, date: Date = now) => {
+  // Lista plana usada em vários pontos da UI já existente
+  const overdue = overdueList.map((x) => x.tenant);
+
+  const getFees = (t: any, refMonth: number = month, date: Date = now) => {
     const { lateFee, interest } = resolveFees(t, settings);
     return calculateTenantFees(
       Number(t.rent_amount),
-      month,
+      refMonth,
       year,
       t.payment_day || 10,
       t.payment_cycle || "postecipado",
@@ -52,9 +66,9 @@ export default function OverduePage() {
     );
   };
 
-  const pendingRevenue = overdue.reduce((sum, t) => {
-    const { totalAmount } = getFees(t);
-    return sum + totalAmount;
+  // Receita pendente = soma de TODOS os meses atrasados de todos
+  const pendingRevenue = overdueList.reduce((sum, item) => {
+    return sum + item.overdueMonths.reduce((s, m) => s + getFees(item.tenant, m).totalAmount, 0);
   }, 0);
 
   const sendOverdueWhatsApp = (t: any) => {
@@ -172,9 +186,14 @@ export default function OverduePage() {
         </CardContent></Card>
       ) : (
         <div className="space-y-4">
-          {overdue.map((t) => {
+          {overdueList.map(({ tenant: t, overdueMonths }) => {
             const rent = Number(t.rent_amount);
-            const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = getFees(t);
+            // Total acumulado de TODOS os meses atrasados desse inquilino
+            const perMonth = overdueMonths.map((m) => ({ m, ...getFees(t, m) }));
+            const totalLate = perMonth.reduce((s, x) => s + x.lateFeeAmount, 0);
+            const totalInterest = perMonth.reduce((s, x) => s + x.interestAmount, 0);
+            const totalAll = perMonth.reduce((s, x) => s + x.totalAmount, 0);
+            const maxDays = Math.max(...perMonth.map((x) => x.daysOverdue));
             return (
               <Card key={t.id} className="rounded-2xl hover:shadow-lg transition-all">
                 <CardContent className="py-5 px-5">
@@ -187,9 +206,21 @@ export default function OverduePage() {
                       <div>
                         <p className="font-bold">{t.name}</p>
                         <p className="text-xs text-muted-foreground">{t.property?.address} — Casa {t.house_number}</p>
-                        <div className="flex gap-2 mt-2">
-                          <Badge className="text-[10px] bg-orange-100 text-orange-700 border-orange-200">Venceu dia {t.payment_day}</Badge>
-                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">{daysOverdue} dias de atraso</Badge>
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          <Badge className="text-[10px] bg-orange-100 text-orange-700 border-orange-200">Vence dia {t.payment_day}</Badge>
+                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">
+                            {overdueMonths.length} {overdueMonths.length === 1 ? "mês" : "meses"} atrasado{overdueMonths.length === 1 ? "" : "s"}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">
+                            até {maxDays} dias
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1 mt-2 flex-wrap">
+                          {overdueMonths.map((m) => (
+                            <Badge key={m} variant="secondary" className="text-[10px]">
+                              {MONTHS_PT[m - 1]}/{year}
+                            </Badge>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -197,20 +228,20 @@ export default function OverduePage() {
                     {/* Fee Breakdown */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase">Original</p>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase">Aluguel</p>
                         <p className="font-bold text-sm">R$ {rent.toFixed(2)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Multa (10%)</p>
-                        <p className="font-bold text-sm text-destructive">R$ {lateFeeAmount.toFixed(2)}</p>
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Multa total</p>
+                        <p className="font-bold text-sm text-destructive">R$ {totalLate.toFixed(2)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Juros (1%/mês)</p>
-                        <p className="font-bold text-sm text-destructive">R$ {interestAmount.toFixed(2)}</p>
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Juros total</p>
+                        <p className="font-bold text-sm text-destructive">R$ {totalInterest.toFixed(2)}</p>
                       </div>
                       <div className="text-center bg-destructive/10 rounded-xl px-3 py-1.5">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Total</p>
-                        <p className="font-bold text-lg text-destructive">R$ {totalAmount.toFixed(2)}</p>
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Total devido</p>
+                        <p className="font-bold text-lg text-destructive">R$ {totalAll.toFixed(2)}</p>
                       </div>
                     </div>
 

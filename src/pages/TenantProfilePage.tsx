@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle, Download, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, UserX, Upload, FileText, ExternalLink, Phone, DollarSign, Calendar, MapPin, User, TrendingUp, TrendingDown, AlertTriangle, StickyNote, CheckCircle2, Clock, XCircle, Download, Trash2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whatsapp";
 import { generateReceipt } from "@/lib/receipt-generator";
@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
 import { useAppSettings, resolveFees } from "@/hooks/use-settings";
+import RenewContractDialog from "@/components/contracts/RenewContractDialog";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -72,6 +73,9 @@ export default function TenantProfilePage() {
   // Payment detail view
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailMonth, setDetailMonth] = useState(0);
+
+  // Renew dialog
+  const [renewOpen, setRenewOpen] = useState(false);
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -442,7 +446,25 @@ export default function TenantProfilePage() {
                 </div>
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase">Data Saída</Label>
-                  <p className="text-sm font-medium">{tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—"}</p>
+                  {(() => {
+                    const exit = tenant.exit_date ? new Date(tenant.exit_date + "T12:00:00") : null;
+                    const days = exit ? Math.ceil((exit.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                    const isExpired = days !== null && days < 0;
+                    const isExpiring = days !== null && days >= 0 && days <= 30;
+                    return (
+                      <>
+                        <p className={`text-sm font-medium ${isExpired ? "text-destructive" : isExpiring ? "text-warning" : ""}`}>
+                          {tenant.exit_date ? new Date(tenant.exit_date).toLocaleDateString("pt-BR") : "—"}
+                        </p>
+                        {isExpired && (
+                          <p className="text-[10px] text-destructive font-semibold mt-0.5">⚠ Vencido há {Math.abs(days!)} dia(s)</p>
+                        )}
+                        {isExpiring && (
+                          <p className="text-[10px] text-warning font-semibold mt-0.5">Vence em {days} dia(s)</p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               {tenant.deposit && (
@@ -451,6 +473,12 @@ export default function TenantProfilePage() {
                   <p className="text-sm font-bold text-primary">R$ {Number(tenant.deposit).toFixed(2)}</p>
                 </div>
               )}
+              <Button
+                onClick={() => setRenewOpen(true)}
+                className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white gap-2 mt-2"
+              >
+                <RefreshCw className="h-4 w-4" /> Renovar contrato
+              </Button>
             </CardContent>
           </Card>
 
@@ -841,6 +869,12 @@ export default function TenantProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Renew Contract Dialog */}
+      <RenewContractDialog
+        open={renewOpen}
+        onOpenChange={setRenewOpen}
+        tenant={tenant}
+      />
     </div>
   );
 }
