@@ -447,7 +447,7 @@ export default function TenantProfilePage() {
                 <div>
                   <Label className="text-[10px] text-muted-foreground uppercase">Data Saída</Label>
                   {(() => {
-                    const exit = tenant.exit_date ? parseISOLocal(tenant.exit_date) : null;
+                    const exit = tenant.exit_date ? new Date(tenant.exit_date + "T12:00:00") : null;
                     const days = exit ? Math.ceil((exit.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
                     const isExpired = days !== null && days < 0;
                     const isExpiring = days !== null && days >= 0 && days <= 30;
