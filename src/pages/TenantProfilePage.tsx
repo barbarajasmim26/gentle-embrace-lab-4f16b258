@@ -74,6 +74,9 @@ export default function TenantProfilePage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailMonth, setDetailMonth] = useState(0);
 
+  // Renew dialog
+  const [renewOpen, setRenewOpen] = useState(false);
+
   const now = new Date();
   const month = now.getMonth() + 1;
 
