@@ -32,17 +32,31 @@ export default function OverduePage() {
   const [payCustomAmount, setPayCustomAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const overdue = tenants?.filter((t) => {
-    const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-    if (isPaymentPaid(payment?.status) || payment?.status === "deposit") return false;
-    return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
-  }) || [];
+  // Para cada inquilino, calcular TODOS os meses atrasados (não apenas o atual).
+  // Verifica de janeiro até o mês atual: se não pago E vencido → atrasado.
+  type OverdueItem = { tenant: any; overdueMonths: number[] };
+  const overdueList: OverdueItem[] = (tenants || [])
+    .map((t) => {
+      const months: number[] = [];
+      for (let m = 1; m <= month; m++) {
+        const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === m);
+        if (isPaymentPaid(payment?.status) || payment?.status === "deposit") continue;
+        if (isOverdue(m, year, t.payment_day || 10, t.payment_cycle, now)) {
+          months.push(m);
+        }
+      }
+      return { tenant: t, overdueMonths: months };
+    })
+    .filter((x) => x.overdueMonths.length > 0);
 
-  const getFees = (t: any, date: Date = now) => {
+  // Lista plana usada em vários pontos da UI já existente
+  const overdue = overdueList.map((x) => x.tenant);
+
+  const getFees = (t: any, refMonth: number = month, date: Date = now) => {
     const { lateFee, interest } = resolveFees(t, settings);
     return calculateTenantFees(
       Number(t.rent_amount),
-      month,
+      refMonth,
       year,
       t.payment_day || 10,
       t.payment_cycle || "postecipado",
@@ -52,9 +66,9 @@ export default function OverduePage() {
     );
   };
 
-  const pendingRevenue = overdue.reduce((sum, t) => {
-    const { totalAmount } = getFees(t);
-    return sum + totalAmount;
+  // Receita pendente = soma de TODOS os meses atrasados de todos
+  const pendingRevenue = overdueList.reduce((sum, item) => {
+    return sum + item.overdueMonths.reduce((s, m) => s + getFees(item.tenant, m).totalAmount, 0);
   }, 0);
 
   const sendOverdueWhatsApp = (t: any) => {
