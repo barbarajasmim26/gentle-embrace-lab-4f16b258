@@ -869,6 +869,12 @@ export default function TenantProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Renew Contract Dialog */}
+      <RenewContractDialog
+        open={renewOpen}
+        onOpenChange={setRenewOpen}
+        tenant={tenant}
+      />
     </div>
   );
 }
