@@ -228,26 +228,51 @@ export default function TenantProfilePage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleReceipt = async (m: number) => {
+  const buildReceiptPdf = async (m: number) => {
     const p = getPayment(m);
-    if (!p) return;
+    if (!p) return null;
+    return generateReceipt({
+      tenantName: tenant.name,
+      amount: Number(p.amount || rentAmount),
+      paymentMethod: "PIX",
+      month: m,
+      year: year,
+      address: tenant.property?.address || tenant.property?.name || "",
+      houseNumber: tenant.house_number || undefined,
+      cpf: tenant.cpf || undefined,
+      paymentDate: p.paid_at || new Date().toISOString().split("T")[0],
+    });
+  };
+
+  const handleReceipt = async (m: number) => {
     try {
-      const pdf = await generateReceipt({
-        tenantName: tenant.name,
-        amount: Number(p.amount || rentAmount),
-        paymentMethod: "PIX",
-        month: m,
-        year: year,
-        address: tenant.property?.address || tenant.property?.name || "",
-        houseNumber: tenant.house_number || undefined,
-        cpf: tenant.cpf || undefined,
-        paymentDate: p.paid_at || new Date().toISOString().split("T")[0],
-      });
+      const pdf = await buildReceiptPdf(m);
+      if (!pdf) return;
       const fileName = `recibo_${tenant.name}_${MONTHS[m - 1]}_${year}.pdf`;
       pdf.save(fileName);
       toast.success("Recibo gerado!");
     } catch (e: any) {
       toast.error(e.message || "Erro ao gerar recibo");
+    }
+  };
+
+  const handleSendReceiptWhatsApp = async (m: number) => {
+    if (!tenant?.phone) {
+      toast.error("Inquilino sem telefone cadastrado.");
+      return;
+    }
+    try {
+      const pdf = await buildReceiptPdf(m);
+      if (!pdf) return;
+      const fileName = `recibo_${tenant.name}_${MONTHS[m - 1]}_${year}.pdf`;
+      pdf.save(fileName);
+      const amount = Number(getPayment(m)?.amount || rentAmount);
+      const monthLabel = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][m - 1];
+      const message = `Olá ${tenant.name}! 😊\n\nSegue em anexo o recibo de aluguel referente ao mês de ${monthLabel}/${year} no valor de R$ ${amount.toFixed(2).replace(".", ",")}.\n\nQualquer dúvida, estamos à disposição!`;
+      openWhatsApp({ phone: tenant.phone, message });
+      toast.success("Recibo baixado e WhatsApp aberto. Anexe o PDF na conversa.");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao enviar recibo");
     }
   };
 
@@ -782,6 +807,16 @@ export default function TenantProfilePage() {
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg" onClick={() => handleReceipt(detailMonth)}>
                   <Receipt className="mr-1 h-3 w-3" />Gerar recibo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => handleSendReceiptWhatsApp(detailMonth)}
+                  disabled={!tenant?.phone}
+                  title={!tenant?.phone ? "Inquilino sem telefone" : "Enviar recibo via WhatsApp"}
+                >
+                  <MessageCircle className="mr-1 h-3 w-3" />Enviar WhatsApp
                 </Button>
               </div>
             </div>
