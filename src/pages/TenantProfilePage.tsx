@@ -808,6 +808,16 @@ export default function TenantProfilePage() {
                 <Button variant="outline" size="sm" className="rounded-lg" onClick={() => handleReceipt(detailMonth)}>
                   <Receipt className="mr-1 h-3 w-3" />Gerar recibo
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => handleSendReceiptWhatsApp(detailMonth)}
+                  disabled={!tenant?.phone}
+                  title={!tenant?.phone ? "Inquilino sem telefone" : "Enviar recibo via WhatsApp"}
+                >
+                  <MessageCircle className="mr-1 h-3 w-3" />Enviar WhatsApp
+                </Button>
               </div>
             </div>
           ) : (
