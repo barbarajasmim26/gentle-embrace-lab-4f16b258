@@ -14,6 +14,8 @@ import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
 import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
 
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 export default function OverduePage() {
   const now = new Date();
   const month = now.getMonth() + 1;
