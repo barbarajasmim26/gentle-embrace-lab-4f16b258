@@ -26,6 +26,8 @@ export default function OverduePage() {
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payTenant, setPayTenant] = useState<any>(null);
+  const [payTenantOverdueMonths, setPayTenantOverdueMonths] = useState<number[]>([]);
+  const [payMonth, setPayMonth] = useState<number>(month);
   const [payStatus, setPayStatus] = useState<"paid" | "paid_late">("paid_late");
   const [payLateFee, setPayLateFee] = useState("10");
   const [payInterest, setPayInterest] = useState("1");
