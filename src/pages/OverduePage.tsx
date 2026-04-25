@@ -91,9 +91,12 @@ export default function OverduePage() {
     openWhatsApp({ phone: t.phone, message });
   };
 
-  const openPayDialog = (t: any) => {
+  const openPayDialog = (t: any, overdueMonths: number[]) => {
     const { lateFee, interest } = resolveFees(t, settings);
     setPayTenant(t);
+    setPayTenantOverdueMonths(overdueMonths);
+    // Marca o mês mais antigo em atraso por padrão (primeiro a ser pago)
+    setPayMonth(overdueMonths[0] ?? month);
     setPayStatus("paid_late");
     setPayLateFee(String(lateFee));
     setPayInterest(String(interest));
@@ -106,10 +109,10 @@ export default function OverduePage() {
     if (!payTenant) return 0;
     const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
     if (payStatus === "paid") return base;
-    
+
     const { totalAmount } = calculateTenantFees(
       base,
-      month,
+      payMonth,
       year,
       payTenant.payment_day || 10,
       payTenant.payment_cycle || "postecipado",
@@ -124,17 +127,18 @@ export default function OverduePage() {
     if (!payTenant) return;
     try {
       await upsertPayment.mutateAsync({
-        tenant_id: payTenant.id, month, year,
+        tenant_id: payTenant.id, month: payMonth, year,
         status: payStatus, amount: calcPayAmount(), paid_at: payDate,
         late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
         interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
       });
-      toast.success(`${payTenant.name} marcado como pago!`);
+      toast.success(`${payTenant.name} — ${MONTHS_PT[payMonth - 1]}/${year} marcado como pago!`);
       setPayDialogOpen(false);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("Erro ao registrar pagamento:", e);
+      toast.error(e?.message || "Erro ao registrar pagamento");
+    }
   };
-
-  const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
     <div className="space-y-6 animate-fade-in">
