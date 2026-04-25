@@ -255,7 +255,7 @@ export default function OverduePage() {
 
                     {/* Actions */}
                     <div className="flex gap-2 shrink-0">
-                      <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={() => openPayDialog(t)}>
+                      <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={() => openPayDialog(t, overdueMonths)}>
                         <CheckCircle2 className="h-4 w-4" /> Marcar Pago
                       </Button>
                       <Button size="sm" variant="outline" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-0 gap-1" onClick={() => sendOverdueWhatsApp(t)}>
