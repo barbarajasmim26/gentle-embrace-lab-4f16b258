@@ -14,6 +14,8 @@ import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
 import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
 
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 export default function OverduePage() {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -26,6 +28,8 @@ export default function OverduePage() {
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payTenant, setPayTenant] = useState<any>(null);
+  const [payTenantOverdueMonths, setPayTenantOverdueMonths] = useState<number[]>([]);
+  const [payMonth, setPayMonth] = useState<number>(month);
   const [payStatus, setPayStatus] = useState<"paid" | "paid_late">("paid_late");
   const [payLateFee, setPayLateFee] = useState("10");
   const [payInterest, setPayInterest] = useState("1");
@@ -89,9 +93,12 @@ export default function OverduePage() {
     openWhatsApp({ phone: t.phone, message });
   };
 
-  const openPayDialog = (t: any) => {
+  const openPayDialog = (t: any, overdueMonths: number[]) => {
     const { lateFee, interest } = resolveFees(t, settings);
     setPayTenant(t);
+    setPayTenantOverdueMonths(overdueMonths);
+    // Marca o mês mais antigo em atraso por padrão (primeiro a ser pago)
+    setPayMonth(overdueMonths[0] ?? month);
     setPayStatus("paid_late");
     setPayLateFee(String(lateFee));
     setPayInterest(String(interest));
@@ -104,10 +111,10 @@ export default function OverduePage() {
     if (!payTenant) return 0;
     const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
     if (payStatus === "paid") return base;
-    
+
     const { totalAmount } = calculateTenantFees(
       base,
-      month,
+      payMonth,
       year,
       payTenant.payment_day || 10,
       payTenant.payment_cycle || "postecipado",
@@ -122,17 +129,18 @@ export default function OverduePage() {
     if (!payTenant) return;
     try {
       await upsertPayment.mutateAsync({
-        tenant_id: payTenant.id, month, year,
+        tenant_id: payTenant.id, month: payMonth, year,
         status: payStatus, amount: calcPayAmount(), paid_at: payDate,
         late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
         interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
       });
-      toast.success(`${payTenant.name} marcado como pago!`);
+      toast.success(`${payTenant.name} — ${MONTHS_PT[payMonth - 1]}/${year} marcado como pago!`);
       setPayDialogOpen(false);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("Erro ao registrar pagamento:", e);
+      toast.error(e?.message || "Erro ao registrar pagamento");
+    }
   };
-
-  const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -247,7 +255,7 @@ export default function OverduePage() {
 
                     {/* Actions */}
                     <div className="flex gap-2 shrink-0">
-                      <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={() => openPayDialog(t)}>
+                      <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={() => openPayDialog(t, overdueMonths)}>
                         <CheckCircle2 className="h-4 w-4" /> Marcar Pago
                       </Button>
                       <Button size="sm" variant="outline" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-0 gap-1" onClick={() => sendOverdueWhatsApp(t)}>
@@ -279,6 +287,28 @@ export default function OverduePage() {
                 <p className="font-semibold text-sm">{payTenant.name}</p>
                 <p className="text-xs text-muted-foreground">Aluguel: R$ {Number(payTenant.rent_amount).toFixed(2)} · Vencimento: Dia {payTenant.payment_day}</p>
               </div>
+              {payTenantOverdueMonths.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="font-semibold">Mês a marcar como pago</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {payTenantOverdueMonths.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant={payMonth === m ? "default" : "outline"}
+                        className={`rounded-lg ${payMonth === m ? "bg-primary text-primary-foreground" : ""}`}
+                        onClick={() => setPayMonth(m)}
+                      >
+                        {MONTHS_PT[m - 1]}/{year}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Cada mês deve ser quitado individualmente. Selecione qual está sendo pago agora.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="font-semibold">Status</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -303,7 +333,7 @@ export default function OverduePage() {
                       const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
                       const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = calculateTenantFees(
                         base,
-                        month,
+                        payMonth,
                         year,
                         payTenant.payment_day || 10,
                         payTenant.payment_cycle || "postecipado",
