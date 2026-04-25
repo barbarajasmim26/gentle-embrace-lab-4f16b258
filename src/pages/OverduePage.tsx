@@ -333,7 +333,7 @@ export default function OverduePage() {
                       const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
                       const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = calculateTenantFees(
                         base,
-                        month,
+                        payMonth,
                         year,
                         payTenant.payment_day || 10,
                         payTenant.payment_cycle || "postecipado",
