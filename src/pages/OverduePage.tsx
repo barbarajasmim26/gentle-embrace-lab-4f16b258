@@ -287,6 +287,28 @@ export default function OverduePage() {
                 <p className="font-semibold text-sm">{payTenant.name}</p>
                 <p className="text-xs text-muted-foreground">Aluguel: R$ {Number(payTenant.rent_amount).toFixed(2)} · Vencimento: Dia {payTenant.payment_day}</p>
               </div>
+              {payTenantOverdueMonths.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="font-semibold">Mês a marcar como pago</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {payTenantOverdueMonths.map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        size="sm"
+                        variant={payMonth === m ? "default" : "outline"}
+                        className={`rounded-lg ${payMonth === m ? "bg-primary text-primary-foreground" : ""}`}
+                        onClick={() => setPayMonth(m)}
+                      >
+                        {MONTHS_PT[m - 1]}/{year}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Cada mês deve ser quitado individualmente. Selecione qual está sendo pago agora.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="font-semibold">Status</Label>
                 <div className="grid grid-cols-2 gap-2">
