@@ -17,6 +17,7 @@ import ReportsPage from "./pages/ReportsPage";
 import ReceiptPage from "./pages/ReceiptPage";
 import SearchPage from "./pages/SearchPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
+import WhatsAppAutoPage from "./pages/WhatsAppAutoPage";
 import ContractImportPage from "./pages/ContractImportPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
@@ -50,6 +51,7 @@ function AuthenticatedApp() {
         <Route path="/receipt" element={<ReceiptPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
+        <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
         <Route path="/import-contract" element={<ContractImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
