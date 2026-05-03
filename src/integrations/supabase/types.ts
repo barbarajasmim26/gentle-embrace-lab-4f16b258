@@ -221,6 +221,170 @@ export type Database = {
           },
         ]
       }
+      whatsapp_config: {
+        Row: {
+          auto_approve_payments: boolean
+          auto_approve_profile: boolean
+          auto_send_receipt: boolean
+          business_phone: string | null
+          created_at: string
+          id: string
+          last_webhook_at: string | null
+          phone_number_id: string | null
+          updated_at: string
+          webhook_verified: boolean
+        }
+        Insert: {
+          auto_approve_payments?: boolean
+          auto_approve_profile?: boolean
+          auto_send_receipt?: boolean
+          business_phone?: string | null
+          created_at?: string
+          id?: string
+          last_webhook_at?: string | null
+          phone_number_id?: string | null
+          updated_at?: string
+          webhook_verified?: boolean
+        }
+        Update: {
+          auto_approve_payments?: boolean
+          auto_approve_profile?: boolean
+          auto_send_receipt?: boolean
+          business_phone?: string | null
+          created_at?: string
+          id?: string
+          last_webhook_at?: string | null
+          phone_number_id?: string | null
+          updated_at?: string
+          webhook_verified?: boolean
+        }
+        Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          ai_confidence: number | null
+          ai_extracted: Json | null
+          body: string | null
+          created_at: string
+          direction: string
+          from_phone: string
+          id: string
+          media_mime_type: string | null
+          media_url: string | null
+          message_type: string
+          processed: boolean
+          raw_payload: Json | null
+          received_at: string
+          tenant_id: string | null
+          to_phone: string | null
+          wa_message_id: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_extracted?: Json | null
+          body?: string | null
+          created_at?: string
+          direction: string
+          from_phone: string
+          id?: string
+          media_mime_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          processed?: boolean
+          raw_payload?: Json | null
+          received_at?: string
+          tenant_id?: string | null
+          to_phone?: string | null
+          wa_message_id?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_extracted?: Json | null
+          body?: string | null
+          created_at?: string
+          direction?: string
+          from_phone?: string
+          id?: string
+          media_mime_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          processed?: boolean
+          raw_payload?: Json | null
+          received_at?: string
+          tenant_id?: string | null
+          to_phone?: string | null
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_pending_actions: {
+        Row: {
+          action_type: string
+          confidence: number | null
+          created_at: string
+          id: string
+          message_id: string | null
+          notes: string | null
+          proposed_data: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          notes?: string | null
+          proposed_data: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          notes?: string | null
+          proposed_data?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_pending_actions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_pending_actions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
