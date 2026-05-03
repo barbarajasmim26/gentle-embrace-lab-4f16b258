@@ -89,9 +89,10 @@ export default function WhatsAppAutoPage() {
     }
   };
 
-  const updateToggle = async (field: keyof Config, value: boolean) => {
+  const updateToggle = async (field: "auto_approve_payments" | "auto_approve_profile" | "auto_send_receipt", value: boolean) => {
     if (!config) return;
-    const { error } = await supabase.from("whatsapp_config").update({ [field]: value }).eq("id", config.id);
+    const patch = { [field]: value } as Record<typeof field, boolean>;
+    const { error } = await supabase.from("whatsapp_config").update(patch).eq("id", config.id);
     if (error) { toast.error("Falha ao salvar"); return; }
     setConfig({ ...config, [field]: value });
   };
