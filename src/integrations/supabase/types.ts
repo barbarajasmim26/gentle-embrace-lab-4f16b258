@@ -227,10 +227,14 @@ export type Database = {
           auto_approve_profile: boolean
           auto_send_receipt: boolean
           business_phone: string | null
+          connection_status: string
           created_at: string
           id: string
+          last_status_check: string | null
           last_webhook_at: string | null
           phone_number_id: string | null
+          provider: string
+          qr_code: string | null
           updated_at: string
           webhook_verified: boolean
         }
@@ -239,10 +243,14 @@ export type Database = {
           auto_approve_profile?: boolean
           auto_send_receipt?: boolean
           business_phone?: string | null
+          connection_status?: string
           created_at?: string
           id?: string
+          last_status_check?: string | null
           last_webhook_at?: string | null
           phone_number_id?: string | null
+          provider?: string
+          qr_code?: string | null
           updated_at?: string
           webhook_verified?: boolean
         }
@@ -251,10 +259,14 @@ export type Database = {
           auto_approve_profile?: boolean
           auto_send_receipt?: boolean
           business_phone?: string | null
+          connection_status?: string
           created_at?: string
           id?: string
+          last_status_check?: string | null
           last_webhook_at?: string | null
           phone_number_id?: string | null
+          provider?: string
+          qr_code?: string | null
           updated_at?: string
           webhook_verified?: boolean
         }
