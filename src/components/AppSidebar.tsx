@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, UserX, AlertTriangle, Bell, Calendar, BarChart3, Receipt, Search, MessageCircle, LogOut, Home, Upload, Moon, Sun, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, UserX, AlertTriangle, Bell, Calendar, BarChart3, Receipt, Search, MessageCircle, LogOut, Home, Upload, Moon, Sun, Settings, Bot } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -19,6 +19,7 @@ const menuItems = [
   { title: "Recibo", url: "/receipt", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
+  { title: "WhatsApp Automático", url: "/whatsapp-auto", icon: Bot },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
