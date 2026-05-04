@@ -8,8 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMessageTemplates, TEMPLATE_LABELS, type TemplateKey } from "@/hooks/use-message-templates";
 import { toast } from "sonner";
-import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, Clock, AlertTriangle, Inbox, MessageSquare, ShieldAlert, Check, X } from "lucide-react";
+import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText } from "lucide-react";
 
 type Config = {
   id: string;
