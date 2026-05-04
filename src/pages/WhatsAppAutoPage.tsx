@@ -101,13 +101,59 @@ export default function WhatsAppAutoPage() {
     setConfig({ ...config, [field]: value });
   };
 
-  const resolvePending = async (id: string, decision: "approved" | "rejected") => {
+  const resolvePending = async (p: Pending, decision: "approved" | "rejected") => {
+    if (decision === "approved" && p.action_type === "payment" && p.tenant_id) {
+      const data = p.proposed_data ?? {};
+      if (data.amount && data.date) {
+        const d = new Date(data.date);
+        if (!isNaN(d.getTime())) {
+          const { error: payErr } = await supabase.from("payments").insert({
+            tenant_id: p.tenant_id,
+            year: d.getFullYear(),
+            month: d.getMonth() + 1,
+            amount: data.amount,
+            paid_at: data.date,
+            status: "paid",
+          });
+          if (payErr) { toast.error("Falha ao registrar pagamento"); return; }
+          if (config?.auto_send_receipt) {
+            try { await supabase.functions.invoke("zapi-send-receipt", { body: { tenantId: p.tenant_id } }); } catch {}
+          }
+        }
+      }
+    }
     const { error } = await supabase
       .from("whatsapp_pending_actions")
       .update({ status: decision, reviewed_at: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", p.id);
     if (error) { toast.error("Falha"); return; }
     toast.success(decision === "approved" ? "Aprovado" : "Rejeitado");
+    loadAll();
+  };
+
+  const sendTest = async () => {
+    if (!testPhone) { toast.error("Informe um número"); return; }
+    setSendingTest(true);
+    try {
+      const { error } = await supabase.functions.invoke("zapi-send", {
+        body: { type: "text", phone: testPhone, message: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp." },
+      });
+      if (error) throw error;
+      toast.success("Mensagem de teste enviada!");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha no envio");
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const undoPending = async (id: string) => {
+    const { error } = await supabase
+      .from("whatsapp_pending_actions")
+      .update({ status: "pending", reviewed_at: null })
+      .eq("id", id);
+    if (error) { toast.error("Falha"); return; }
+    toast.success("Ação desfeita");
     loadAll();
   };
 
