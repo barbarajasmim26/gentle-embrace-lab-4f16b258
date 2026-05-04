@@ -279,10 +279,10 @@ export default function WhatsAppAutoPage() {
                   </div>
                   <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">{JSON.stringify(p.proposed_data, null, 2)}</pre>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => resolvePending(p.id, "approved")}>
+                    <Button size="sm" onClick={() => resolvePending(p, "approved")}>
                       <Check className="h-3 w-3 mr-1" />Aprovar
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => resolvePending(p.id, "rejected")}>
+                    <Button size="sm" variant="outline" onClick={() => resolvePending(p, "rejected")}>
                       <X className="h-3 w-3 mr-1" />Rejeitar
                     </Button>
                   </div>
