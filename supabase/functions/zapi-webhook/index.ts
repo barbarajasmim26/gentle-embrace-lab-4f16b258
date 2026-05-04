@@ -1,5 +1,4 @@
-// Webhook público recebe mensagens da Z-API, identifica inquilino,
-// chama IA multimodal pra ler comprovantes e cria pendência ou pagamento.
+// Webhook público recebe mensagens da Z-API
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -26,14 +25,22 @@ function normalizePhone(p: string): string {
 }
 
 async function findTenantByPhone(phone: string) {
-  const norm = normalizePhone(phone);
-  const res = await sb(`tenants?select=id,name,rent_amount,phone&status=eq.active`);
-  const list = await res.json();
-  if (!Array.isArray(list)) return null;
-  return list.find((t: any) => normalizePhone(t.phone ?? "") === norm) ?? null;
+  try {
+    const norm = normalizePhone(phone);
+    const res = await sb(`tenants?select=id,name,rent_amount,phone&status=eq.active`);
+    if (!res.ok) return null;
+    const list = await res.json();
+    if (!Array.isArray(list)) return null;
+    return list.find((t: any) => normalizePhone(t.phone ?? "") === norm) ?? null;
+  } catch (e) {
+    console.error("Error finding tenant:", e);
+    return null;
+  }
 }
 
 async function extractWithAI(opts: { text?: string; imageUrl?: string; mimeType?: string }) {
+  if (!LOVABLE_API_KEY) return null;
+  
   const userContent: any[] = [];
   if (opts.text) userContent.push({ type: "text", text: opts.text });
   if (opts.imageUrl) {
@@ -44,240 +51,176 @@ async function extractWithAI(opts: { text?: string; imageUrl?: string; mimeType?
   }
   if (userContent.length === 0) return null;
 
-  const body = {
-    model: "google/gemini-2.5-flash",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Você analisa comprovantes de pagamento (PIX, TED, boleto). Extraia os dados em JSON. Se não for um comprovante, retorne is_payment=false.",
-      },
-      { role: "user", content: userContent },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "extract_payment",
-        description: "Extrai dados de comprovante de pagamento",
-        parameters: {
-          type: "object",
-          properties: {
-            is_payment: { type: "boolean" },
-            amount: { type: "number", description: "Valor em reais" },
-            date: { type: "string", description: "Data ISO YYYY-MM-DD" },
-            payer_name: { type: "string" },
-            bank: { type: "string" },
-            transaction_id: { type: "string" },
-            confidence: { type: "number", description: "0 a 1" },
-          },
-          required: ["is_payment", "confidence"],
-          additionalProperties: false,
+  try {
+    const body = {
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content: "Você analisa comprovantes de pagamento (PIX, TED, boleto). Extraia os dados em JSON. Se não for um comprovante, retorne is_payment=false.",
         },
+        { role: "user", content: userContent },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "extract_payment",
+          description: "Extrai dados de comprovante de pagamento",
+          parameters: {
+            type: "object",
+            properties: {
+              is_payment: { type: "boolean" },
+              amount: { type: "number", description: "Valor em reais" },
+              date: { type: "string", description: "Data ISO YYYY-MM-DD" },
+              payer_name: { type: "string" },
+              bank: { type: "string" },
+              transaction_id: { type: "string" },
+              confidence: { type: "number", description: "0 a 1" },
+            },
+            required: ["is_payment", "confidence"],
+            additionalProperties: false,
+          },
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "extract_payment" } },
+    };
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
-    }],
-    tool_choice: { type: "function", function: { name: "extract_payment" } },
-  };
+      body: JSON.stringify(body),
+    });
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    console.error("AI error", res.status, await res.text());
+    if (!res.ok) return null;
+    const data = await res.json();
+    const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    if (!args) return null;
+    return JSON.parse(args);
+  } catch (e) {
+    console.error("AI error:", e);
     return null;
   }
-  const data = await res.json();
-  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-  if (!args) return null;
-  try { return JSON.parse(args); } catch { return null; }
-}
-
-async function getConfig() {
-  const res = await sb(`whatsapp_config?select=*&limit=1`);
-  const list = await res.json();
-  return Array.isArray(list) && list[0] ? list[0] : null;
-}
-
-async function autoApprovePayment(tenant: any, extracted: any, messageId: string) {
-  if (!extracted?.amount || !extracted?.date) return false;
-  const tolerance = Number(tenant.rent_amount) * 0.02; // 2%
-  if (Math.abs(Number(extracted.amount) - Number(tenant.rent_amount)) > tolerance) return false;
-
-  const d = new Date(extracted.date);
-  if (isNaN(d.getTime())) return false;
-
-  await sb(`payments`, {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      tenant_id: tenant.id,
-      year: d.getFullYear(),
-      month: d.getMonth() + 1,
-      amount: extracted.amount,
-      paid_at: extracted.date,
-      status: "paid",
-    }),
-  });
-  return true;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  
+  // Resposta rápida para GET (Z-API pode usar para validar)
   if (req.method === "GET") {
-    return new Response("Z-API webhook ativo", { headers: corsHeaders });
+    return new Response("OK", { headers: corsHeaders });
   }
 
   try {
     const payload = await req.json();
-    console.log("zapi webhook:", JSON.stringify(payload).slice(0, 500));
+    console.log("Payload recebido:", JSON.stringify(payload));
 
-    // Z-API payload comum: { phone, fromMe, type, text:{message}, image:{imageUrl,mimeType,caption}, document:{...} }
-    // O payload pode vir de diferentes formas dependendo do evento (on-message-received, etc)
     if (payload.fromMe === true) {
-      return new Response(JSON.stringify({ ok: true, ignored: "fromMe" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ ok: true, msg: "Ignored fromMe" }), { headers: corsHeaders });
     }
 
     const fromPhone = payload.phone ?? payload.from ?? "";
-    const text = payload.text?.message ?? payload.message ?? payload.body ?? payload.caption ?? null;
+    const text = payload.text?.message ?? payload.message ?? payload.body ?? payload.caption ?? "";
     const imageUrl = payload.image?.imageUrl ?? payload.image?.url ?? null;
     const documentUrl = payload.document?.documentUrl ?? payload.document?.url ?? null;
     const mimeType = payload.image?.mimeType ?? payload.document?.mimeType ?? null;
+    const waId = payload.messageId ?? payload.id ?? null;
 
-    let messageType = "text";
-    if (imageUrl) messageType = "image";
-    else if (documentUrl) messageType = "document";
-
-    // identifica inquilino
     const tenant = await findTenantByPhone(fromPhone);
 
-    // salva mensagem
-    const insertRes = await sb(`whatsapp_messages?select=id`, {
+    // 1. Salvar a mensagem
+    const msgRes = await sb("whatsapp_messages", {
       method: "POST",
       headers: { Prefer: "return=representation" },
       body: JSON.stringify({
         direction: "inbound",
         from_phone: fromPhone,
-        message_type: messageType,
+        message_type: imageUrl ? "image" : (documentUrl ? "document" : "text"),
         body: text,
         media_url: imageUrl ?? documentUrl,
         media_mime_type: mimeType,
         tenant_id: tenant?.id ?? null,
-        wa_message_id: payload.messageId ?? payload.id ?? null,
+        wa_message_id: waId,
         raw_payload: payload,
-        processed: false,
-      }),
+        processed: false
+      })
     });
-    const inserted = await insertRes.json();
-    const messageId = Array.isArray(inserted) ? inserted[0]?.id : (inserted?.id ?? null);
 
-    // atualiza last_webhook_at
-    const cfg = await getConfig();
-    if (cfg) {
-      await sb(`whatsapp_config?id=eq.${cfg.id}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ 
-          last_webhook_at: new Date().toISOString(), 
-          webhook_verified: true,
-          last_error_message: null // limpa erro ao receber webhook com sucesso
-        }),
-      });
+    let messageId = null;
+    if (msgRes.ok) {
+      const inserted = await msgRes.json();
+      messageId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
     }
 
-    // se não achou inquilino, cria pendência de identificação
-    if (!tenant) {
-      await sb(`whatsapp_pending_actions`, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          action_type: "unknown_sender",
-          message_id: messageId,
-          proposed_data: { from_phone: fromPhone, body: text },
-          status: "pending",
-        }),
-      });
-      return new Response(JSON.stringify({ ok: true, pending: "unknown_sender" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 2. Atualizar config de "último contato"
+    await sb("whatsapp_config?select=id&limit=1").then(r => r.json()).then(async (list) => {
+      if (Array.isArray(list) && list[0]) {
+        await sb(`whatsapp_config?id=eq.${list[0].id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ 
+            last_webhook_at: new Date().toISOString(), 
+            webhook_verified: true,
+            last_error_message: null 
+          })
+        });
+      }
+    }).catch(() => {});
 
-    // se tem mídia ou texto que parece comprovante, chama IA
-    const looksLikeProof = imageUrl || documentUrl ||
-      (text && /pix|comprovante|transfer|pago|pagamento|r\$/i.test(text));
-
-    if (looksLikeProof) {
+    // 3. Processar com IA se necessário
+    const looksLikeProof = imageUrl || documentUrl || (text && /pix|comprovante|pago|r\$/i.test(text));
+    
+    if (tenant && looksLikeProof) {
       const extracted = await extractWithAI({
-        text: text ?? undefined,
+        text: text || undefined,
         imageUrl: imageUrl ?? documentUrl ?? undefined,
-        mimeType: mimeType ?? undefined,
+        mimeType: mimeType ?? undefined
       });
 
       if (extracted) {
         if (messageId) {
           await sb(`whatsapp_messages?id=eq.${messageId}`, {
             method: "PATCH",
-            headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({
-              ai_extracted: extracted,
-              ai_confidence: extracted.confidence ?? null,
-              processed: true,
-            }),
+            body: JSON.stringify({ ai_extracted: extracted, ai_confidence: extracted.confidence, processed: true })
           });
         }
 
-        if (extracted.is_payment && cfg?.auto_approve_payments && (extracted.confidence ?? 0) >= 0.85) {
-          const ok = await autoApprovePayment(tenant, extracted, messageId);
-          if (ok) {
-            // envia recibo automaticamente se habilitado
-            if (cfg?.auto_send_receipt) {
-              try {
-                await fetch(`${SUPABASE_URL}/functions/v1/zapi-send-receipt`, {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${SERVICE_ROLE}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ tenantId: tenant.id }),
-                });
-              } catch (err) { console.error("send-receipt fail:", err); }
-            }
-            return new Response(JSON.stringify({ ok: true, auto_approved: true }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        }
-
-        // cria pendência pra revisão
-        await sb(`whatsapp_pending_actions`, {
+        // Criar pendência
+        await sb("whatsapp_pending_actions", {
           method: "POST",
-          headers: { Prefer: "return=minimal" },
           body: JSON.stringify({
-            action_type: extracted.is_payment ? "payment" : "unclear_message",
             message_id: messageId,
             tenant_id: tenant.id,
+            action_type: extracted.is_payment ? "payment" : "unclear_message",
             proposed_data: extracted,
-            confidence: extracted.confidence ?? null,
-            status: "pending",
-          }),
+            confidence: extracted.confidence,
+            status: "pending"
+          })
         });
       }
+    } else if (!tenant) {
+      // Número desconhecido
+      await sb("whatsapp_pending_actions", {
+        method: "POST",
+        body: JSON.stringify({
+          message_id: messageId,
+          action_type: "unknown_sender",
+          proposed_data: { from_phone: fromPhone, body: text },
+          status: "pending"
+        })
+      });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok: true }), { 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
+
   } catch (e) {
-    console.error("webhook error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.error("Fatal webhook error:", e);
+    return new Response(JSON.stringify({ error: e.message }), { 
+      status: 500, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
   }
 });
