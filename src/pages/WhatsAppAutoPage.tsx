@@ -56,6 +56,9 @@ export default function WhatsAppAutoPage() {
   const [pending, setPending] = useState<Pending[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [checking, setChecking] = useState(false);
+  const [testPhone, setTestPhone] = useState("5513988312733");
+  const [sendingTest, setSendingTest] = useState(false);
+  const { templates, updateTemplate, resetTemplate, isModified } = useMessageTemplates();
 
   const loadAll = async () => {
     const [{ data: cfg }, { data: pen }, { data: msg }] = await Promise.all([
