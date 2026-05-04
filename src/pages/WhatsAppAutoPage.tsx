@@ -63,7 +63,7 @@ export default function WhatsAppAutoPage() {
   const loadAll = async () => {
     const [{ data: cfg }, { data: pen }, { data: msg }] = await Promise.all([
       supabase.from("whatsapp_config").select("*").limit(1).maybeSingle(),
-      supabase.from("whatsapp_pending_actions").select("*").eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from("whatsapp_pending_actions").select("*").order("created_at", { ascending: false }).limit(30),
       supabase.from("whatsapp_messages").select("*").order("created_at", { ascending: false }).limit(30),
     ]);
     setConfig(cfg as any);
