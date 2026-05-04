@@ -8,8 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMessageTemplates, TEMPLATE_LABELS, type TemplateKey } from "@/hooks/use-message-templates";
 import { toast } from "sonner";
-import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, Clock, AlertTriangle, Inbox, MessageSquare, ShieldAlert, Check, X } from "lucide-react";
+import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText } from "lucide-react";
 
 type Config = {
   id: string;
@@ -52,11 +56,14 @@ export default function WhatsAppAutoPage() {
   const [pending, setPending] = useState<Pending[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [checking, setChecking] = useState(false);
+  const [testPhone, setTestPhone] = useState("5513988312733");
+  const [sendingTest, setSendingTest] = useState(false);
+  const { templates, updateTemplate, resetTemplate, isModified } = useMessageTemplates();
 
   const loadAll = async () => {
     const [{ data: cfg }, { data: pen }, { data: msg }] = await Promise.all([
       supabase.from("whatsapp_config").select("*").limit(1).maybeSingle(),
-      supabase.from("whatsapp_pending_actions").select("*").eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from("whatsapp_pending_actions").select("*").order("created_at", { ascending: false }).limit(30),
       supabase.from("whatsapp_messages").select("*").order("created_at", { ascending: false }).limit(30),
     ]);
     setConfig(cfg as any);
@@ -97,13 +104,59 @@ export default function WhatsAppAutoPage() {
     setConfig({ ...config, [field]: value });
   };
 
-  const resolvePending = async (id: string, decision: "approved" | "rejected") => {
+  const resolvePending = async (p: Pending, decision: "approved" | "rejected") => {
+    if (decision === "approved" && p.action_type === "payment" && p.tenant_id) {
+      const data = p.proposed_data ?? {};
+      if (data.amount && data.date) {
+        const d = new Date(data.date);
+        if (!isNaN(d.getTime())) {
+          const { error: payErr } = await supabase.from("payments").insert({
+            tenant_id: p.tenant_id,
+            year: d.getFullYear(),
+            month: d.getMonth() + 1,
+            amount: data.amount,
+            paid_at: data.date,
+            status: "paid",
+          });
+          if (payErr) { toast.error("Falha ao registrar pagamento"); return; }
+          if (config?.auto_send_receipt) {
+            try { await supabase.functions.invoke("zapi-send-receipt", { body: { tenantId: p.tenant_id } }); } catch {}
+          }
+        }
+      }
+    }
     const { error } = await supabase
       .from("whatsapp_pending_actions")
       .update({ status: decision, reviewed_at: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", p.id);
     if (error) { toast.error("Falha"); return; }
     toast.success(decision === "approved" ? "Aprovado" : "Rejeitado");
+    loadAll();
+  };
+
+  const sendTest = async () => {
+    if (!testPhone) { toast.error("Informe um número"); return; }
+    setSendingTest(true);
+    try {
+      const { error } = await supabase.functions.invoke("zapi-send", {
+        body: { type: "text", phone: testPhone, message: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp." },
+      });
+      if (error) throw error;
+      toast.success("Mensagem de teste enviada!");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha no envio");
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const undoPending = async (id: string) => {
+    const { error } = await supabase
+      .from("whatsapp_pending_actions")
+      .update({ status: "pending", reviewed_at: null })
+      .eq("id", id);
+    if (error) { toast.error("Falha"); return; }
+    toast.success("Ação desfeita");
     loadAll();
   };
 
@@ -169,10 +222,28 @@ export default function WhatsAppAutoPage() {
               No painel Z-API → Webhook → "Ao receber mensagens", cole essa URL.
             </p>
           </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Testar envio</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="55139..."
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+              />
+              <Button onClick={sendTest} disabled={sendingTest}>
+                <Send className={`h-4 w-4 mr-2 ${sendingTest ? "animate-pulse" : ""}`} />
+                Testar WhatsApp
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Envia: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp."
+            </p>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Automação */}
       <Card>
         <CardHeader><CardTitle>Automação híbrida</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -218,6 +289,9 @@ export default function WhatsAppAutoPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{p.action_type}</Badge>
+                      <Badge variant={p.status === "pending" ? "secondary" : p.status === "approved" ? "default" : "destructive"}>
+                        {p.status}
+                      </Badge>
                       {p.confidence != null && (
                         <span className="text-xs text-muted-foreground">{Math.round(p.confidence * 100)}% confiança</span>
                       )}
@@ -226,17 +300,61 @@ export default function WhatsAppAutoPage() {
                   </div>
                   <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">{JSON.stringify(p.proposed_data, null, 2)}</pre>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => resolvePending(p.id, "approved")}>
-                      <Check className="h-3 w-3 mr-1" />Aprovar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => resolvePending(p.id, "rejected")}>
-                      <X className="h-3 w-3 mr-1" />Rejeitar
-                    </Button>
+                    {p.status === "pending" ? (
+                      <>
+                        <Button size="sm" onClick={() => resolvePending(p, "approved")}>
+                          <Check className="h-3 w-3 mr-1" />Aprovar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => resolvePending(p, "rejected")}>
+                          <X className="h-3 w-3 mr-1" />Rejeitar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => undoPending(p.id)}>
+                        <Undo2 className="h-3 w-3 mr-1" />Desfazer
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Modelos de mensagem */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Modelos automáticos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="reminder">
+            <TabsList className="flex flex-wrap h-auto">
+              {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
+                <TabsTrigger key={k} value={k}>{TEMPLATE_LABELS[k]}</TabsTrigger>
+              ))}
+            </TabsList>
+            {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
+              <TabsContent key={k} value={k} className="space-y-2">
+                <Textarea
+                  rows={6}
+                  value={templates[k]}
+                  onChange={(e) => updateTemplate(k, e.target.value)}
+                />
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-muted-foreground">
+                    Variáveis: {"{nome} {valor} {mes} {ano} {endereco} {casa} {vencimento} {multa} {juros} {total}"}
+                  </p>
+                  {isModified(k) && (
+                    <Button size="sm" variant="ghost" onClick={() => resetTemplate(k)}>Restaurar padrão</Button>
+                  )}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
       </Card>
 
