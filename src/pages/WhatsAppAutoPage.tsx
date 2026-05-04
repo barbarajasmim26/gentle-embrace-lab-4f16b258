@@ -222,10 +222,28 @@ export default function WhatsAppAutoPage() {
               No painel Z-API → Webhook → "Ao receber mensagens", cole essa URL.
             </p>
           </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Testar envio</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="55139..."
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+              />
+              <Button onClick={sendTest} disabled={sendingTest}>
+                <Send className={`h-4 w-4 mr-2 ${sendingTest ? "animate-pulse" : ""}`} />
+                Testar WhatsApp
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Envia: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp."
+            </p>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Automação */}
       <Card>
         <CardHeader><CardTitle>Automação híbrida</CardTitle></CardHeader>
         <CardContent className="space-y-4">
