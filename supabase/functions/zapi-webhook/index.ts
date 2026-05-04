@@ -229,6 +229,19 @@ Deno.serve(async (req) => {
         if (extracted.is_payment && cfg?.auto_approve_payments && (extracted.confidence ?? 0) >= 0.85) {
           const ok = await autoApprovePayment(tenant, extracted, messageId);
           if (ok) {
+            // envia recibo automaticamente se habilitado
+            if (cfg?.auto_send_receipt) {
+              try {
+                await fetch(`${SUPABASE_URL}/functions/v1/zapi-send-receipt`, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${SERVICE_ROLE}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ tenantId: tenant.id }),
+                });
+              } catch (err) { console.error("send-receipt fail:", err); }
+            }
             return new Response(JSON.stringify({ ok: true, auto_approved: true }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
