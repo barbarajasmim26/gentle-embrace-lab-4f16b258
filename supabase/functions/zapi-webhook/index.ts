@@ -137,6 +137,7 @@ Deno.serve(async (req) => {
     console.log("zapi webhook:", JSON.stringify(payload).slice(0, 500));
 
     // Z-API payload comum: { phone, fromMe, type, text:{message}, image:{imageUrl,mimeType,caption}, document:{...} }
+    // O payload pode vir de diferentes formas dependendo do evento (on-message-received, etc)
     if (payload.fromMe === true) {
       return new Response(JSON.stringify({ ok: true, ignored: "fromMe" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -144,8 +145,7 @@ Deno.serve(async (req) => {
     }
 
     const fromPhone = payload.phone ?? payload.from ?? "";
-    const senderName = payload.senderName ?? payload.chatName ?? payload.notifyName ?? null;
-    const text = payload.text?.message ?? payload.message ?? payload.body ?? null;
+    const text = payload.text?.message ?? payload.message ?? payload.body ?? payload.caption ?? null;
     const imageUrl = payload.image?.imageUrl ?? payload.image?.url ?? null;
     const documentUrl = payload.document?.documentUrl ?? payload.document?.url ?? null;
     const mimeType = payload.image?.mimeType ?? payload.document?.mimeType ?? null;
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
       }),
     });
     const inserted = await insertRes.json();
-    const messageId = Array.isArray(inserted) ? inserted[0]?.id : null;
+    const messageId = Array.isArray(inserted) ? inserted[0]?.id : (inserted?.id ?? null);
 
     // atualiza last_webhook_at
     const cfg = await getConfig();
@@ -183,7 +183,11 @@ Deno.serve(async (req) => {
       await sb(`whatsapp_config?id=eq.${cfg.id}`, {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ last_webhook_at: new Date().toISOString(), webhook_verified: true }),
+        body: JSON.stringify({ 
+          last_webhook_at: new Date().toISOString(), 
+          webhook_verified: true,
+          last_error_message: null // limpa erro ao receber webhook com sucesso
+        }),
       });
     }
 
@@ -216,15 +220,17 @@ Deno.serve(async (req) => {
       });
 
       if (extracted) {
-        await sb(`whatsapp_messages?id=eq.${messageId}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            ai_extracted: extracted,
-            ai_confidence: extracted.confidence ?? null,
-            processed: true,
-          }),
-        });
+        if (messageId) {
+          await sb(`whatsapp_messages?id=eq.${messageId}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({
+              ai_extracted: extracted,
+              ai_confidence: extracted.confidence ?? null,
+              processed: true,
+            }),
+          });
+        }
 
         if (extracted.is_payment && cfg?.auto_approve_payments && (extracted.confidence ?? 0) >= 0.85) {
           const ok = await autoApprovePayment(tenant, extracted, messageId);

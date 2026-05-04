@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMessageTemplates, TEMPLATE_LABELS, type TemplateKey } from "@/hooks/use-message-templates";
 import { toast } from "sonner";
-import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText } from "lucide-react";
+import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText, Info } from "lucide-react";
 
 type Config = {
   id: string;
@@ -24,6 +24,7 @@ type Config = {
   auto_approve_payments: boolean;
   auto_approve_profile: boolean;
   auto_send_receipt: boolean;
+  last_error_message: string | null;
 };
 
 type Pending = {
@@ -87,10 +88,18 @@ export default function WhatsAppAutoPage() {
     try {
       const { data, error } = await supabase.functions.invoke("zapi-status");
       if (error) throw error;
-      toast.success(`Status: ${data?.connectionStatus ?? "?"}`);
+      
+      if (data?.connectionStatus === "connected") {
+        toast.success("Z-API Conectada com sucesso!");
+      } else {
+        const msg = data?.lastErrorMessage || "Z-API Desconectada";
+        toast.error(`Status: ${msg}`);
+      }
       await loadAll();
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao consultar Z-API");
+      console.error("Status check error:", e);
+      toast.error(e?.message || "Falha ao consultar Z-API");
+      await loadAll();
     } finally {
       setChecking(false);
     }
@@ -138,13 +147,20 @@ export default function WhatsAppAutoPage() {
     if (!testPhone) { toast.error("Informe um número"); return; }
     setSendingTest(true);
     try {
-      const { error } = await supabase.functions.invoke("zapi-send", {
+      const { data, error } = await supabase.functions.invoke("zapi-send", {
         body: { type: "text", phone: testPhone, message: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp." },
       });
-      if (error) throw error;
+      
+      if (error) {
+        // Tenta extrair erro detalhado se disponível
+        const details = error instanceof Error ? error.message : JSON.stringify(error);
+        throw new Error(details);
+      }
+      
       toast.success("Mensagem de teste enviada!");
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha no envio");
+      console.error("Send test error:", e);
+      toast.error(e?.message || "Falha no envio. Verifique se a instância está conectada.");
     } finally {
       setSendingTest(false);
     }
@@ -202,6 +218,16 @@ export default function WhatsAppAutoPage() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
+          {config?.last_error_message && config.connection_status !== "connected" && (
+            <Alert variant="destructive" className="py-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-xs">Erro retornado pela API</AlertTitle>
+              <AlertDescription className="text-xs font-mono">
+                {config.last_error_message}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {config?.connection_status !== "connected" && config?.qr_code && (
             <div className="flex flex-col items-center gap-2 p-4 border rounded-xl bg-muted/30">
               <QrCode className="h-4 w-4 text-muted-foreground" />
@@ -239,11 +265,117 @@ export default function WhatsAppAutoPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Envia: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp."
+              Envia uma mensagem de teste para validar a conexão.
             </p>
           </div>
         </CardContent>
       </Card>
+
+      <Tabs defaultValue="pending" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pending" className="gap-2">
+            <Inbox className="h-4 w-4" /> Pendentes ({pending.filter(p => p.status === "pending").length})
+          </TabsTrigger>
+          <TabsTrigger value="history" className="gap-2">
+            <FileText className="h-4 w-4" /> Histórico de Ações
+          </TabsTrigger>
+          <TabsTrigger value="messages" className="gap-2">
+            <MessageCircle className="h-4 w-4" /> Mensagens Recentes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-4">
+                  {pending.filter(p => p.status === "pending").length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                      <p>Nenhuma pendência para revisão</p>
+                    </div>
+                  ) : (
+                    pending.filter(p => p.status === "pending").map((p) => (
+                      <div key={p.id} className="flex items-start justify-between p-4 border rounded-xl bg-muted/20">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="capitalize">{p.action_type.replace("_", " ")}</Badge>
+                            <span className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString("pt-BR")}</span>
+                          </div>
+                          <p className="text-sm font-medium">
+                            {p.action_type === "payment" ? `Pagamento de R$ ${p.proposed_data?.amount}` : "Mensagem não identificada"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Confiança da IA: {(p.confidence || 0) * 100}%</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100" onClick={() => resolvePending(p, "approved")}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100" onClick={() => resolvePending(p, "rejected")}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {pending.filter(p => p.status !== "pending").map((p) => (
+                    <div key={p.id} className="flex items-center justify-between p-3 border-b last:border-0 text-sm">
+                      <div className="flex items-center gap-3">
+                        {p.status === "approved" ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-rose-500" />}
+                        <div>
+                          <p className="font-medium capitalize">{p.action_type.replace("_", " ")}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString("pt-BR")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={p.status === "approved" ? "secondary" : "outline"}>{p.status === "approved" ? "Aprovado" : "Rejeitado"}</Badge>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => undoPending(p.id)}><Undo2 className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="messages" className="mt-4">
+          <Card>
+            <CardContent className="pt-6">
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-3">
+                  {messages.map((m) => (
+                    <div key={m.id} className={`flex flex-col p-3 rounded-xl max-w-[85%] ${m.direction === "inbound" ? "bg-muted self-start" : "bg-emerald-500/10 border border-emerald-100 self-end ml-auto"}`}>
+                      <div className="flex items-center justify-between gap-4 mb-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{m.from_phone}</span>
+                        <span className="text-[10px] text-muted-foreground">{new Date(m.created_at).toLocaleTimeString("pt-BR")}</span>
+                      </div>
+                      <p className="text-sm">{m.body || (m.message_type === "image" ? "📷 Imagem" : "📄 Documento")}</p>
+                      {m.media_url && (
+                        <a href={m.media_url} target="_blank" rel="noreferrer" className="mt-2 text-[10px] text-emerald-600 flex items-center gap-1 hover:underline">
+                          <FileText className="h-3 w-3" /> Ver mídia
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       <Card>
         <CardHeader><CardTitle>Automação híbrida</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -263,134 +395,11 @@ export default function WhatsAppAutoPage() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <Label>Enviar recibo automaticamente após confirmar</Label>
-              <p className="text-xs text-muted-foreground">Gera PDF e envia pelo WhatsApp.</p>
+              <Label>Enviar recibo automaticamente</Label>
+              <p className="text-xs text-muted-foreground">Envia o PDF do recibo assim que o pagamento for aprovado.</p>
             </div>
             <Switch checked={!!config?.auto_send_receipt} onCheckedChange={(v) => updateToggle("auto_send_receipt", v)} />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Pendências */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            Pendências para revisão ({pending.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pending.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Nenhuma pendência. ✅</p>
-          ) : (
-            <div className="space-y-3">
-              {pending.map((p) => (
-                <div key={p.id} className="border rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{p.action_type}</Badge>
-                      <Badge variant={p.status === "pending" ? "secondary" : p.status === "approved" ? "default" : "destructive"}>
-                        {p.status}
-                      </Badge>
-                      {p.confidence != null && (
-                        <span className="text-xs text-muted-foreground">{Math.round(p.confidence * 100)}% confiança</span>
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString("pt-BR")}</span>
-                  </div>
-                  <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">{JSON.stringify(p.proposed_data, null, 2)}</pre>
-                  <div className="flex gap-2">
-                    {p.status === "pending" ? (
-                      <>
-                        <Button size="sm" onClick={() => resolvePending(p, "approved")}>
-                          <Check className="h-3 w-3 mr-1" />Aprovar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => resolvePending(p, "rejected")}>
-                          <X className="h-3 w-3 mr-1" />Rejeitar
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => undoPending(p.id)}>
-                        <Undo2 className="h-3 w-3 mr-1" />Desfazer
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modelos de mensagem */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Modelos automáticos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="reminder">
-            <TabsList className="flex flex-wrap h-auto">
-              {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
-                <TabsTrigger key={k} value={k}>{TEMPLATE_LABELS[k]}</TabsTrigger>
-              ))}
-            </TabsList>
-            {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
-              <TabsContent key={k} value={k} className="space-y-2">
-                <Textarea
-                  rows={6}
-                  value={templates[k]}
-                  onChange={(e) => updateTemplate(k, e.target.value)}
-                />
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-muted-foreground">
-                    Variáveis: {"{nome} {valor} {mes} {ano} {endereco} {casa} {vencimento} {multa} {juros} {total}"}
-                  </p>
-                  {isModified(k) && (
-                    <Button size="sm" variant="ghost" onClick={() => resetTemplate(k)}>Restaurar padrão</Button>
-                  )}
-                </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* Histórico */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Inbox className="h-4 w-4" />
-            Histórico de mensagens
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-2">
-              {messages.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-6">Sem mensagens ainda.</p>
-              )}
-              {messages.map((m) => (
-                <div key={m.id} className={`p-3 rounded-lg border text-sm ${m.direction === "inbound" ? "bg-muted/40" : "bg-emerald-500/5 border-emerald-500/20"}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium">
-                      {m.direction === "inbound" ? `📥 ${m.from_phone}` : `📤 ${m.to_phone}`} · {m.message_type}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString("pt-BR")}</span>
-                  </div>
-                  {m.body && <p className="text-sm">{m.body}</p>}
-                  {m.media_url && <a href={m.media_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline">Ver mídia</a>}
-                  {m.ai_extracted && (
-                    <div className="mt-2 text-xs bg-background/50 rounded p-2">
-                      <span className="font-medium">IA:</span> R$ {m.ai_extracted.amount ?? "—"} · {m.ai_extracted.date ?? "—"} · {m.ai_extracted.payer_name ?? "—"}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
         </CardContent>
       </Card>
     </div>

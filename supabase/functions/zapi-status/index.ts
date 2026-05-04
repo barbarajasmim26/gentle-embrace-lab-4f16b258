@@ -53,7 +53,9 @@ Deno.serve(async (req) => {
 
   try {
     if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN) {
-      return new Response(JSON.stringify({ error: "Z-API não configurado" }), {
+      const errorMsg = "Z-API não configurado: Faltam ZAPI_INSTANCE_ID ou ZAPI_TOKEN";
+      await updateConfig({ last_error_message: errorMsg, connection_status: "disconnected" });
+      return new Response(JSON.stringify({ error: errorMsg }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -61,20 +63,52 @@ Deno.serve(async (req) => {
 
     // 1. Status
     const statusRes = await fetch(`${baseUrl()}/status`, { headers: zapiHeaders() });
+    
+    if (!statusRes.ok) {
+      const errorText = await statusRes.text();
+      let errorMsg = `Erro na Z-API (${statusRes.status})`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMsg = errorJson.message || errorJson.error || errorMsg;
+      } catch {
+        errorMsg = errorText || errorMsg;
+      }
+      
+      await updateConfig({ 
+        last_error_message: errorMsg, 
+        connection_status: "disconnected",
+        last_status_check: new Date().toISOString() 
+      });
+      
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: statusRes.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const status = await statusRes.json();
 
     let connectionStatus = "disconnected";
     let qrCode: string | null = null;
+    let lastErrorMessage: string | null = null;
 
     if (status.connected === true) {
       connectionStatus = "connected";
-    } else if (status.smartphoneConnected === false || status.error) {
+    } else {
       connectionStatus = "disconnected";
+      if (status.error) {
+        lastErrorMessage = status.error;
+      } else if (status.smartphoneConnected === false) {
+        lastErrorMessage = "Celular desconectado";
+      }
+      
       // tenta pegar QR
       try {
         const qrRes = await fetch(`${baseUrl()}/qr-code/image`, { headers: zapiHeaders() });
-        const qr = await qrRes.json();
-        if (qr.value) qrCode = qr.value;
+        if (qrRes.ok) {
+          const qr = await qrRes.json();
+          if (qr.value) qrCode = qr.value;
+        }
       } catch (_) { /* ignore */ }
     }
 
@@ -82,15 +116,18 @@ Deno.serve(async (req) => {
       connection_status: connectionStatus,
       qr_code: qrCode,
       last_status_check: new Date().toISOString(),
+      last_error_message: lastErrorMessage
     });
 
     return new Response(
-      JSON.stringify({ connectionStatus, qrCode, raw: status }),
+      JSON.stringify({ connectionStatus, qrCode, lastErrorMessage, raw: status }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("zapi-status error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
+    const errorMsg = e instanceof Error ? e.message : "Unknown error";
+    await updateConfig({ last_error_message: errorMsg });
+    return new Response(JSON.stringify({ error: errorMsg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
