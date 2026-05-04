@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
     }
 
     const fromPhone = payload.phone ?? payload.from ?? "";
+    const senderName = payload.senderName ?? payload.chatName ?? payload.notifyName ?? null;
     const text = payload.text?.message ?? payload.message ?? payload.body ?? null;
     const imageUrl = payload.image?.imageUrl ?? payload.image?.url ?? null;
     const documentUrl = payload.document?.documentUrl ?? payload.document?.url ?? null;
