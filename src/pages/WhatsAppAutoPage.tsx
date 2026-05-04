@@ -289,6 +289,9 @@ export default function WhatsAppAutoPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{p.action_type}</Badge>
+                      <Badge variant={p.status === "pending" ? "secondary" : p.status === "approved" ? "default" : "destructive"}>
+                        {p.status}
+                      </Badge>
                       {p.confidence != null && (
                         <span className="text-xs text-muted-foreground">{Math.round(p.confidence * 100)}% confiança</span>
                       )}
@@ -297,12 +300,20 @@ export default function WhatsAppAutoPage() {
                   </div>
                   <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">{JSON.stringify(p.proposed_data, null, 2)}</pre>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => resolvePending(p, "approved")}>
-                      <Check className="h-3 w-3 mr-1" />Aprovar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => resolvePending(p, "rejected")}>
-                      <X className="h-3 w-3 mr-1" />Rejeitar
-                    </Button>
+                    {p.status === "pending" ? (
+                      <>
+                        <Button size="sm" onClick={() => resolvePending(p, "approved")}>
+                          <Check className="h-3 w-3 mr-1" />Aprovar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => resolvePending(p, "rejected")}>
+                          <X className="h-3 w-3 mr-1" />Rejeitar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => undoPending(p.id)}>
+                        <Undo2 className="h-3 w-3 mr-1" />Desfazer
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
