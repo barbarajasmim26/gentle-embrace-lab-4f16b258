@@ -9,11 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMessageTemplates, TEMPLATE_LABELS, type TemplateKey } from "@/hooks/use-message-templates";
+import { useMessageTemplates } from "@/hooks/use-message-templates";
 import { toast } from "sonner";
-import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText, Info } from "lucide-react";
+import { Bot, RefreshCw, QrCode, CheckCircle2, XCircle, AlertTriangle, Inbox, ShieldAlert, Check, X, Send, Undo2, FileText, MessageCircle } from "lucide-react";
 
 type Config = {
   id: string;
@@ -59,17 +58,21 @@ export default function WhatsAppAutoPage() {
   const [checking, setChecking] = useState(false);
   const [testPhone, setTestPhone] = useState("5513988312733");
   const [sendingTest, setSendingTest] = useState(false);
-  const { templates, updateTemplate, resetTemplate, isModified } = useMessageTemplates();
+  const { templates } = useMessageTemplates();
 
   const loadAll = async () => {
-    const [{ data: cfg }, { data: pen }, { data: msg }] = await Promise.all([
-      supabase.from("whatsapp_config").select("*").limit(1).maybeSingle(),
-      supabase.from("whatsapp_pending_actions").select("*").order("created_at", { ascending: false }).limit(30),
-      supabase.from("whatsapp_messages").select("*").order("created_at", { ascending: false }).limit(30),
-    ]);
-    setConfig(cfg as any);
-    setPending((pen as any) ?? []);
-    setMessages((msg as any) ?? []);
+    try {
+      const [{ data: cfg }, { data: pen }, { data: msg }] = await Promise.all([
+        supabase.from("whatsapp_config").select("*").limit(1).maybeSingle(),
+        supabase.from("whatsapp_pending_actions").select("*").order("created_at", { ascending: false }).limit(30),
+        supabase.from("whatsapp_messages").select("*").order("created_at", { ascending: false }).limit(30),
+      ]);
+      setConfig(cfg as any);
+      setPending((pen as any) ?? []);
+      setMessages((msg as any) ?? []);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    }
   };
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function WhatsAppAutoPage() {
       if (data?.connectionStatus === "connected") {
         toast.success("Z-API Conectada com sucesso!");
       } else {
-        const msg = data?.lastErrorMessage || "Z-API Desconectada";
+        const msg = data?.lastErrorMessage || data?.error || "Z-API Desconectada";
         toast.error(`Status: ${msg}`);
       }
       await loadAll();
@@ -147,16 +150,11 @@ export default function WhatsAppAutoPage() {
     if (!testPhone) { toast.error("Informe um número"); return; }
     setSendingTest(true);
     try {
-      const { data, error } = await supabase.functions.invoke("zapi-send", {
+      const { error } = await supabase.functions.invoke("zapi-send", {
         body: { type: "text", phone: testPhone, message: "Teste realizado com sucesso ✅ Sistema Mesquita Imóveis conectado ao WhatsApp." },
       });
       
-      if (error) {
-        // Tenta extrair erro detalhado se disponível
-        const details = error instanceof Error ? error.message : JSON.stringify(error);
-        throw new Error(details);
-      }
-      
+      if (error) throw error;
       toast.success("Mensagem de teste enviada!");
     } catch (e: any) {
       console.error("Send test error:", e);
