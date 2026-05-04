@@ -322,6 +322,42 @@ export default function WhatsAppAutoPage() {
         </CardContent>
       </Card>
 
+      {/* Modelos de mensagem */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Modelos automáticos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="reminder">
+            <TabsList className="flex flex-wrap h-auto">
+              {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
+                <TabsTrigger key={k} value={k}>{TEMPLATE_LABELS[k]}</TabsTrigger>
+              ))}
+            </TabsList>
+            {(Object.keys(TEMPLATE_LABELS) as TemplateKey[]).map((k) => (
+              <TabsContent key={k} value={k} className="space-y-2">
+                <Textarea
+                  rows={6}
+                  value={templates[k]}
+                  onChange={(e) => updateTemplate(k, e.target.value)}
+                />
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-muted-foreground">
+                    Variáveis: {"{nome} {valor} {mes} {ano} {endereco} {casa} {vencimento} {multa} {juros} {total}"}
+                  </p>
+                  {isModified(k) && (
+                    <Button size="sm" variant="ghost" onClick={() => resetTemplate(k)}>Restaurar padrão</Button>
+                  )}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </CardContent>
+      </Card>
+
       {/* Histórico */}
       <Card>
         <CardHeader>
