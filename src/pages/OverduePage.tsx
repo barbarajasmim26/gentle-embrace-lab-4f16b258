@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, MessageCircle, Eye, CheckCircle2, Clock, DollarSign, Home, CalendarDays } from "lucide-react";
+import { AlertTriangle, MessageCircle, Eye, CheckCircle2, Clock, DollarSign, Home, CalendarDays, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { openWhatsApp, getMessageTemplates } from "@/lib/whatsapp";
 import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -35,9 +36,9 @@ export default function OverduePage() {
   const [payInterest, setPayInterest] = useState("1");
   const [payCustomAmount, setPayCustomAmount] = useState("");
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
+  const [sendingZapi, setSendingZapi] = useState<string | null>(null);
 
   // Para cada inquilino, calcular TODOS os meses atrasados (não apenas o atual).
-  // Verifica de janeiro até o mês atual: se não pago E vencido → atrasado.
   type OverdueItem = { tenant: any; overdueMonths: number[] };
   const overdueList: OverdueItem[] = (tenants || [])
     .map((t) => {
@@ -53,7 +54,6 @@ export default function OverduePage() {
     })
     .filter((x) => x.overdueMonths.length > 0);
 
-  // Lista plana usada em vários pontos da UI já existente
   const overdue = overdueList.map((x) => x.tenant);
 
   const getFees = (t: any, refMonth: number = month, date: Date = now) => {
@@ -70,7 +70,6 @@ export default function OverduePage() {
     );
   };
 
-  // Receita pendente = soma de TODOS os meses atrasados de todos
   const pendingRevenue = overdueList.reduce((sum, item) => {
     return sum + item.overdueMonths.reduce((s, m) => s + getFees(item.tenant, m).totalAmount, 0);
   }, 0);
@@ -84,7 +83,6 @@ export default function OverduePage() {
       dueDay: t.payment_day || 10, lateFee: 10, interest: 1, totalWithFees: totalAmount,
     });
     
-    // Adiciona informação de dias de atraso se for relevante
     let message = templates.overdue;
     if (daysOverdue > 0) {
       message = message.replace("está em atraso.", `está em atraso há ${daysOverdue} dias.`);
@@ -93,11 +91,32 @@ export default function OverduePage() {
     openWhatsApp({ phone: t.phone, message });
   };
 
+  const sendZapiBilling = async (t: any) => {
+    if (!t.phone) { toast.error("Telefone não cadastrado."); return; }
+    setSendingZapi(t.id);
+    try {
+      const message = `Olá ${t.name}, seu aluguel está vencido. Por favor, regularizar.`;
+      const { error } = await supabase.functions.invoke("zapi-send", {
+        body: { 
+          phone: t.phone, 
+          message: message,
+          tenantId: t.id 
+        }
+      });
+      if (error) throw error;
+      toast.success(`Cobrança enviada para ${t.name} via Z-API!`);
+    } catch (e: any) {
+      console.error("Erro ao enviar cobrança Z-API:", e);
+      toast.error(e?.message || "Erro ao enviar cobrança via Z-API");
+    } finally {
+      setSendingZapi(null);
+    }
+  };
+
   const openPayDialog = (t: any, overdueMonths: number[]) => {
     const { lateFee, interest } = resolveFees(t, settings);
     setPayTenant(t);
     setPayTenantOverdueMonths(overdueMonths);
-    // Marca o mês mais antigo em atraso por padrão (primeiro a ser pago)
     setPayMonth(overdueMonths[0] ?? month);
     setPayStatus("paid_late");
     setPayLateFee(String(lateFee));
@@ -118,7 +137,7 @@ export default function OverduePage() {
       year,
       payTenant.payment_day || 10,
       payTenant.payment_cycle || "postecipado",
-      new Date(payDate + "T12:00:00"), // Evita problemas de fuso horário
+      new Date(payDate + "T12:00:00"),
       Number(payLateFee),
       Number(payInterest)
     );
@@ -144,7 +163,6 @@ export default function OverduePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
           <AlertTriangle className="h-6 w-6" />
@@ -155,7 +173,6 @@ export default function OverduePage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="rounded-2xl border-0 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg">
           <CardContent className="pt-5 pb-5 flex items-center justify-between">
@@ -186,7 +203,6 @@ export default function OverduePage() {
         </Card>
       </div>
 
-      {/* Tenant Cards */}
       {!overdue.length ? (
         <Card className="rounded-2xl"><CardContent className="py-12 text-center">
           <div className="text-4xl mb-3">🎉</div>
@@ -196,7 +212,6 @@ export default function OverduePage() {
         <div className="space-y-4">
           {overdueList.map(({ tenant: t, overdueMonths }) => {
             const rent = Number(t.rent_amount);
-            // Total acumulado de TODOS os meses atrasados desse inquilino
             const perMonth = overdueMonths.map((m) => ({ m, ...getFees(t, m) }));
             const totalLate = perMonth.reduce((s, x) => s + x.lateFeeAmount, 0);
             const totalInterest = perMonth.reduce((s, x) => s + x.interestAmount, 0);
@@ -206,7 +221,6 @@ export default function OverduePage() {
               <Card key={t.id} className="rounded-2xl hover:shadow-lg transition-all">
                 <CardContent className="py-5 px-5">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    {/* Tenant Info */}
                     <div className="flex items-start gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted shrink-0">
                         <Home className="h-5 w-5 text-muted-foreground" />
@@ -233,36 +247,40 @@ export default function OverduePage() {
                       </div>
                     </div>
 
-                    {/* Fee Breakdown */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="text-center">
                         <p className="text-[10px] font-semibold text-muted-foreground uppercase">Aluguel</p>
                         <p className="font-bold text-sm">R$ {rent.toFixed(2)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Multa total</p>
-                        <p className="font-bold text-sm text-destructive">R$ {totalLate.toFixed(2)}</p>
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Multa/Juros</p>
+                        <p className="font-bold text-sm text-destructive">R$ {(totalLate + totalInterest).toFixed(2)}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Juros total</p>
-                        <p className="font-bold text-sm text-destructive">R$ {totalInterest.toFixed(2)}</p>
-                      </div>
-                      <div className="text-center bg-destructive/10 rounded-xl px-3 py-1.5">
-                        <p className="text-[10px] font-semibold text-destructive uppercase">Total devido</p>
+                      <div className="text-center bg-destructive/5 px-3 py-1 rounded-xl border border-destructive/10">
+                        <p className="text-[10px] font-semibold text-destructive uppercase">Total</p>
                         <p className="font-bold text-lg text-destructive">R$ {totalAll.toFixed(2)}</p>
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 shrink-0">
-                      <Button size="sm" className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white gap-1" onClick={() => openPayDialog(t, overdueMonths)}>
-                        <CheckCircle2 className="h-4 w-4" /> Marcar Pago
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="rounded-xl h-10 gap-2" onClick={() => navigate(`/tenants/${t.id}`)}>
+                        <Eye className="h-4 w-4" /> Perfil
                       </Button>
-                      <Button size="sm" variant="outline" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-0 gap-1" onClick={() => sendOverdueWhatsApp(t)}>
-                        <MessageCircle className="h-4 w-4" /> Cobrar
+                      <Button variant="outline" size="sm" className="rounded-xl h-10 gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50" onClick={() => sendOverdueWhatsApp(t)}>
+                        <MessageCircle className="h-4 w-4" /> WhatsApp
                       </Button>
-                      <Button size="sm" variant="ghost" className="rounded-lg text-xs" onClick={() => navigate(`/tenants/${t.id}`)}>
-                        Ver Perfil
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700" 
+                        onClick={() => sendZapiBilling(t)}
+                        disabled={sendingZapi === t.id}
+                      >
+                        <Send className={`h-4 w-4 ${sendingZapi === t.id ? "animate-pulse" : ""}`} /> 
+                        Cobrança Auto
+                      </Button>
+                      <Button variant="default" size="sm" className="rounded-xl h-10 gap-2 shadow-md" onClick={() => openPayDialog(t, overdueMonths)}>
+                        <DollarSign className="h-4 w-4" /> Baixar
                       </Button>
                     </div>
                   </div>
@@ -273,93 +291,77 @@ export default function OverduePage() {
         </div>
       )}
 
-      {/* Pay Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-3xl max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-emerald-500" /> Registrar Pagamento
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              Confirmar Pagamento
             </DialogTitle>
           </DialogHeader>
-          {payTenant && (
-            <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="font-semibold text-sm">{payTenant.name}</p>
-                <p className="text-xs text-muted-foreground">Aluguel: R$ {Number(payTenant.rent_amount).toFixed(2)} · Vencimento: Dia {payTenant.payment_day}</p>
-              </div>
-              {payTenantOverdueMonths.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="font-semibold">Mês a marcar como pago</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {payTenantOverdueMonths.map((m) => (
-                      <Button
-                        key={m}
-                        type="button"
-                        size="sm"
-                        variant={payMonth === m ? "default" : "outline"}
-                        className={`rounded-lg ${payMonth === m ? "bg-primary text-primary-foreground" : ""}`}
-                        onClick={() => setPayMonth(m)}
-                      >
-                        {MONTHS_PT[m - 1]}/{year}
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Cada mês deve ser quitado individualmente. Selecione qual está sendo pago agora.
-                  </p>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label className="font-semibold">Status</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant={payStatus === "paid" ? "default" : "outline"} className={`rounded-lg ${payStatus === "paid" ? "bg-emerald-500 hover:bg-emerald-600 text-white" : ""}`} onClick={() => setPayStatus("paid")}>
-                    <CheckCircle2 className="mr-1 h-4 w-4" />Pago em dia
-                  </Button>
-                  <Button variant={payStatus === "paid_late" ? "default" : "outline"} className={`rounded-lg ${payStatus === "paid_late" ? "bg-orange-500 hover:bg-orange-600 text-white" : ""}`} onClick={() => setPayStatus("paid_late")}>
-                    <Clock className="mr-1 h-4 w-4" />Pago em atraso
-                  </Button>
-                </div>
-              </div>
-              <div><Label>Data do pagamento</Label><Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></div>
-              {payStatus === "paid_late" && (
-                <div className="space-y-3 p-3 rounded-lg border border-orange-300/30 bg-orange-50 dark:bg-orange-500/10">
-                  <p className="text-sm font-semibold text-orange-600">Multa e Juros (Cálculo Diário)</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label className="text-xs">Multa (%)</Label><Input type="number" step="0.1" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} /></div>
-                    <div><Label className="text-xs">Juros Mensal (%)</Label><Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} /></div>
-                  </div>
-                  <div className="text-sm space-y-1">
-                    {(() => {
-                      const base = payCustomAmount ? Number(payCustomAmount) : Number(payTenant.rent_amount);
-                      const { lateFeeAmount, interestAmount, totalAmount, daysOverdue } = calculateTenantFees(
-                        base,
-                        payMonth,
-                        year,
-                        payTenant.payment_day || 10,
-                        payTenant.payment_cycle || "postecipado",
-                        new Date(payDate + "T12:00:00"),
-                        Number(payLateFee),
-                        Number(payInterest)
-                      );
-                      return (
-                        <>
-                          <div className="flex justify-between"><span className="text-muted-foreground">Atraso:</span><span className="font-semibold">{daysOverdue} dias</span></div>
-                          <div className="flex justify-between"><span className="text-muted-foreground">Original:</span><span>R$ {base.toFixed(2)}</span></div>
-                          <div className="flex justify-between text-orange-600"><span>Multa ({payLateFee}%):</span><span>R$ {lateFeeAmount.toFixed(2)}</span></div>
-                          <div className="flex justify-between text-orange-600"><span>Juros ({payInterest}%/mês):</span><span>R$ {interestAmount.toFixed(2)}</span></div>
-                          <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total:</span><span>R$ {totalAmount.toFixed(2)}</span></div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-              <div><Label>Valor pago (opcional)</Label><Input type="number" step="0.01" placeholder={calcPayAmount().toFixed(2)} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} /></div>
-              <Button className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white" onClick={confirmPayment} disabled={upsertPayment.isPending}>
-                {upsertPayment.isPending ? "Salvando..." : `Confirmar — R$ ${calcPayAmount().toFixed(2)}`}
-              </Button>
+          <div className="space-y-4 pt-4">
+            <div className="p-4 bg-muted/50 rounded-2xl border border-muted-foreground/10">
+              <p className="text-sm font-bold">{payTenant?.name}</p>
+              <p className="text-xs text-muted-foreground">{payTenant?.property?.address}</p>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mês de Referência</Label>
+                <select className="w-full h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm" value={payMonth} onChange={(e) => setPayMonth(Number(e.target.value))}>
+                  {payTenantOverdueMonths.map((m) => (
+                    <option key={m} value={m}>{MONTHS_PT[m - 1]}/{year}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Data do Pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="rounded-xl h-10" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Status do Recebimento</Label>
+              <div className="flex gap-2 p-1 bg-muted rounded-xl">
+                <Button variant={payStatus === "paid" ? "default" : "ghost"} size="sm" className="flex-1 rounded-lg text-xs h-8" onClick={() => setPayStatus("paid")}>No Prazo</Button>
+                <Button variant={payStatus === "paid_late" ? "default" : "ghost"} size="sm" className="flex-1 rounded-lg text-xs h-8" onClick={() => setPayStatus("paid_late")}>Com Atraso</Button>
+              </div>
+            </div>
+
+            {payStatus === "paid_late" && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Multa (%)</Label>
+                  <Input type="number" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} className="rounded-xl h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Juros p/ dia (%)</Label>
+                  <Input type="number" step="0.1" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} className="rounded-xl h-10" />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Valor Base (Opcional)</Label>
+              <Input type="number" placeholder={`Original: R$ ${payTenant?.rent_amount}`} value={payCustomAmount} onChange={(e) => setPayCustomAmount(e.target.value)} className="rounded-xl h-10" />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+              <div className="flex items-center gap-2 text-emerald-700">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-semibold uppercase tracking-wider">Total a Receber</span>
+              </div>
+              <p className="text-2xl font-black text-emerald-700">
+                R$ {calcPayAmount().toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <Button className="w-full h-12 rounded-2xl font-bold text-lg shadow-lg" onClick={confirmPayment}>
+              Confirmar Recebimento
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
