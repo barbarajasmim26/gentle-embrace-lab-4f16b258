@@ -88,6 +88,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Z-API às vezes retorna 200 com {error:"NOT_FOUND"} se as credenciais estão erradas
+    if (statusData?.error === "NOT_FOUND") {
+      const msg = "Credenciais Z-API inválidas (NOT_FOUND): confira ZAPI_INSTANCE_ID e ZAPI_TOKEN. Eles devem ser exatamente os mesmos do painel Z-API → 'Instâncias' (sem espaços).";
+      await updateConfig({ connection_status: "disconnected", last_error_message: msg, last_status_check: new Date().toISOString() });
+      return new Response(JSON.stringify({ connectionStatus: "disconnected", lastErrorMessage: msg, raw: statusData }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const connected = statusData?.connected === true || statusData?.smartphoneConnected === true;
     let qrCode: string | null = null;
     let errorMsg: string | null = connected ? null : (statusData?.error || statusData?.message || "Aguardando conexão (escaneie o QR Code).");
