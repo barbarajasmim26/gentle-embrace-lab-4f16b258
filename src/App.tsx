@@ -51,7 +51,7 @@ function AuthenticatedApp() {
         <Route path="/receipt" element={<ReceiptPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
-        <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
+        <Route path="/ai-assistant" element={<WhatsAppAutoPage />} />
         <Route path="/import-contract" element={<ContractImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />

@@ -186,10 +186,8 @@ export default function WhatsAppAutoPage() {
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
           <Bot className="h-6 w-6" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">WhatsApp Automático</h1>
-          <p className="text-sm text-muted-foreground">Integração via Z-API — recebe comprovantes e atualiza pagamentos</p>
-        </div>
+        <di          <h1 className="text-2xl font-bold">Assistente de IA</h1>
+191	          <p className="text-sm text-muted-foreground">Processamento inteligente de comprovantes e notificações</p>        </div>
       </div>
 
       <Alert variant="destructive" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200">

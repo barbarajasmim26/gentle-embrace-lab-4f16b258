@@ -19,7 +19,7 @@ const menuItems = [
   { title: "Recibo", url: "/receipt", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
-  { title: "WhatsApp Automático", url: "/whatsapp-auto", icon: Bot },
+  { title: "Assistente de IA", url: "/ai-assistant", icon: Bot },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
