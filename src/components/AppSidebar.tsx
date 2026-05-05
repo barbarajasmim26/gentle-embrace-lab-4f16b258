@@ -18,9 +18,8 @@ const menuItems = [
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Recibo", url: "/receipt", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Assistente de IA", url: "/ai-assistant", icon: Bot },
-  { title: "Configurações", url: "/settings", icon: Settings },
+22	  { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

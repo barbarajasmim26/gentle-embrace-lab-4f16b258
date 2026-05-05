@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Users, DollarSign, AlertTriangle, FileText, Bell, Calendar,
-  BarChart3, Receipt, Search, MessageCircle, ChevronRight, Home,
-  TrendingUp, Clock, Plus,
+  BarChart3, Receipt, Search, ChevronRight, Home,
+  TrendingUp, Plus, Bot
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
@@ -20,13 +20,7 @@ export default function DashboardPage() {
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
-  const overdue = tenants?.filter((t) => {
-    const payment = allPayments?.find((p: any) => p.tenant_id === t.id && p.month === month);
-    if (isPaymentPaid(payment?.status) || payment?.status === "deposit") return false;
-    return isOverdue(month, year, t.payment_day || 10, t.payment_cycle, now);
-  }) || [];
-
-  // Conta alertas reais (vencidos + vencendo em 30 dias) — mesma lógica da página de Alertas
+  // Conta alertas reais (vencidos + vencendo em 30 dias)
   const activeOnly = (tenants || []).filter((t) => t.status === "active");
   const expired = activeOnly.filter((t) => t.exit_date && parseISO(t.exit_date) < now && !isToday(parseISO(t.exit_date)));
   const expiringSoon = activeOnly.filter((t) => {
@@ -138,13 +132,13 @@ export default function DashboardPage() {
       url: "/search",
     },
     {
-      title: "WhatsApp",
-      desc: "Envie mensagens aos inquilinos",
-      icon: MessageCircle,
-      iconBg: "bg-success",
-      badge: "Conectado",
-      badgeColor: "bg-success/10 text-success",
-      url: "/whatsapp",
+      title: "Assistente de IA",
+      desc: "Processar comprovantes e avisos",
+      icon: Bot,
+      iconBg: "bg-emerald-500",
+      badge: "Inteligente",
+      badgeColor: "bg-emerald-500/10 text-emerald-600",
+      url: "/ai-assistant",
     },
   ];
 
@@ -152,7 +146,7 @@ export default function DashboardPage() {
     { label: "Gerar Novo Recibo", icon: Receipt, url: "/receipt", color: "bg-warning hover:bg-warning/90 text-warning-foreground" },
     { label: "Ver Alertas", icon: Bell, url: "/alerts", color: "bg-destructive hover:bg-destructive/90 text-destructive-foreground" },
     { label: "Ver Atrasados", icon: AlertTriangle, url: "/overdue", color: "bg-primary hover:bg-primary/90 text-primary-foreground" },
-    { label: "Enviar WhatsApp", icon: MessageCircle, url: "/whatsapp", color: "bg-success hover:bg-success/90 text-success-foreground" },
+    { label: "Assistente de IA", icon: Bot, url: "/ai-assistant", color: "bg-emerald-500 hover:bg-emerald-600 text-white" },
   ];
 
   return (
