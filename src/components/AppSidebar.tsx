@@ -19,7 +19,7 @@ const menuItems = [
   { title: "Recibo", url: "/receipt", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
   { title: "Assistente de IA", url: "/ai-assistant", icon: Bot },
-22	  { title: "Configurações", url: "/settings", icon: Settings },
+{ title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
