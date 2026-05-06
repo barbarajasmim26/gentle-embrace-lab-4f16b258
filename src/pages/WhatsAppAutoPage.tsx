@@ -113,12 +113,13 @@ export default function WhatsAppAutoPage() {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop();
-      const fileName = `${Math.random()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("contracts").upload(`receipts/${fileName}`, file);
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `receipts/${fileName}`;
+      const { error: upErr } = await supabase.storage.from("contracts").upload(path, file, { contentType: file.type });
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("contracts").getPublicUrl(`receipts/${fileName}`);
-      const { error } = await supabase.functions.invoke("process-receipt-ai", { body: { imageUrl: publicUrl } });
+      const { data, error } = await supabase.functions.invoke("process-receipt-ai", { body: { filePath: path } });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       toast.success("Comprovante processado pela IA!");
       loadPending();
     } catch (err: any) {
