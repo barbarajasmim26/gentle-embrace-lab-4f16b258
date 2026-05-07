@@ -29,6 +29,7 @@ export default function ReceiptPage() {
   const [paymentMethod, setPaymentMethod] = useState("Pix");
   const [signatureName, setSignatureName] = useState("Maria Eneide da Silva");
   const [paidBy, setPaidBy] = useState("");
+  const [cpfInput, setCpfInput] = useState("");
 
   const filteredTenants = useMemo(() => {
     if (!tenants) return [];
@@ -49,7 +50,7 @@ export default function ReceiptPage() {
     if (!tenant) return null;
     return {
       tenantName: tenant.name,
-      cpf: tenant.cpf || undefined,
+      cpf: cpfInput || tenant.cpf || undefined,
       address: tenant.property?.address || "____________________________",
       houseNumber: tenant.house_number || undefined,
       amount,
@@ -61,7 +62,7 @@ export default function ReceiptPage() {
       signatureName,
       paidBy: paidBy || undefined,
     } satisfies ReceiptData;
-  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName, paidBy]);
+  }, [tenant, amount, monthNumber, yearNumber, emissionDate, paymentMethod, paymentType, signatureName, paidBy, cpfInput]);
 
   const handleGenerate = async (mode: "download" | "print" | "whatsapp") => {
     if (!previewData) {
@@ -205,6 +206,10 @@ export default function ReceiptPage() {
                       {PAYMENT_METHOD_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">CPF (editar se necessário)</Label>
+                  <Input placeholder={tenant?.cpf || "Digite o CPF"} value={cpfInput} onChange={(e) => setCpfInput(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Valor enviado por (opcional)</Label>
