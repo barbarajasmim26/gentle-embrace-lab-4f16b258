@@ -119,11 +119,15 @@ export default function TenantProfilePage() {
 
         if (extractErr) throw extractErr;
 
-        // Update tenant with extracted CPF if found
-        if (extractedData?.cpf) {
+        // Update tenant with extracted data (CPF and name)
+        const updateData: any = {};
+        if (extractedData?.cpf) updateData.cpf = extractedData.cpf;
+        if (extractedData?.name) updateData.name = extractedData.name;
+
+        if (Object.keys(updateData).length > 0) {
           const { error: updateErr } = await supabase
             .from("tenants")
-            .update({ cpf: extractedData.cpf })
+            .update(updateData)
             .eq("id", id);
 
           if (!updateErr) {
@@ -141,7 +145,7 @@ export default function TenantProfilePage() {
     // Dismiss loading toast and show result
     toast.dismiss();
     if (updated > 0) {
-      toast.success(`CPF atualizado de ${updated} contrato(s)!`);
+      toast.success(`Dados atualizados de ${updated} contrato(s)! (CPF e Nome)`);
     }
     if (failed > 0) {
       toast.error(`Falha ao processar ${failed} contrato(s).`);
@@ -642,8 +646,8 @@ export default function TenantProfilePage() {
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-lg font-bold">Documentos e Contratos</CardTitle>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => handleReloadContractCPF()} title="Recarregar e extrair CPF dos contratos">
-                  <RefreshCw className="h-4 w-4" /> Atualizar CPF
+                <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => handleReloadContractCPF()} title="Recarregar e extrair CPF e Nome dos contratos">
+                  <RefreshCw className="h-4 w-4" /> Atualizar Dados
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => setUploadOpen(true)}>
                   <Plus className="h-4 w-4" /> Adicionar
