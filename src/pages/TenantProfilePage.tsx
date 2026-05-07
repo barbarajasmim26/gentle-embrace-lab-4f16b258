@@ -398,11 +398,9 @@ export default function TenantProfilePage() {
             <div className="flex items-center gap-1.5 text-sm">
               <MapPin className="h-4 w-4" /> {tenant.property?.name || tenant.property?.address}, Casa {tenant.house_number}
             </div>
-            {tenant.phone && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <Phone className="h-4 w-4" /> {tenant.phone}
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 text-sm">
+              <Phone className="h-4 w-4" /> {tenant.phone || "Não informado"}
+            </div>
             <div className="flex items-center gap-1.5 text-sm">
               <FileText className="h-4 w-4" /> CPF: {tenant.cpf || "Não informado"}
             </div>
