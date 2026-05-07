@@ -9,16 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users, RefreshCw, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { isOverdue as checkOverdue, isPaymentPaid } from "@/lib/payment-status";
+import { supabase } from "@/integrations/supabase/client";
 
 import TenantCreateDialog from "@/components/tenants/TenantCreateDialog";
 import TenantCard from "@/components/tenants/TenantCard";
 
 export default function TenantsPage() {
-  const { data: tenants, isLoading } = useTenants("active");
+  const { data: tenants, isLoading, refetch } = useTenants("active");
   const { data: properties } = useProperties();
   const { data: allPayments } = useAllPayments(new Date().getFullYear());
   const createTenant = useCreateTenant();
@@ -26,6 +28,10 @@ export default function TenantsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
+  const [updateData, setUpdateData] = useState<Record<string, { name: string; cpf: string }>>({});
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -36,7 +42,6 @@ export default function TenantsPage() {
     return t.name.toLowerCase().includes(q) || t.house_number?.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q);
   });
 
-  // Group tenants by property
   const grouped = filtered?.reduce<Record<string, typeof filtered>>((acc, t) => {
     const key = t.property_id || "sem-imovel";
     if (!acc[key]) acc[key] = [];
@@ -58,7 +63,6 @@ export default function TenantsPage() {
     const tenant = tenants?.find((t) => t.id === tenantId);
     if (!tenant) return null;
 
-    // Se o usuário definiu um status manual de comportamento
     if (tenant.status === "irregular") {
       return { label: "Irregular", icon: AlertTriangle, colorClass: "bg-warning/10 text-warning border-warning/30" };
     }
@@ -79,6 +83,65 @@ export default function TenantsPage() {
     return isPaymentPaid(payment?.status);
   };
 
+  const handleSelectTenant = (tenantId: string) => {
+    setSelectedTenants(prev => 
+      prev.includes(tenantId) ? prev.filter(id => id !== tenantId) : [...prev, tenantId]
+    );
+    
+    const tenant = tenants?.find(t => t.id === tenantId);
+    if (tenant && !updateData[tenantId]) {
+      setUpdateData(prev => ({
+        ...prev,
+        [tenantId]: { name: tenant.name || "", cpf: tenant.cpf || "" }
+      }));
+    }
+  };
+
+  const handleUpdateData = (tenantId: string, field: "name" | "cpf", value: string) => {
+    setUpdateData(prev => ({
+      ...prev,
+      [tenantId]: { ...prev[tenantId], [field]: value }
+    }));
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedTenants.length === 0) {
+      toast.error("Selecione pelo menos um inquilino");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      for (const tenantId of selectedTenants) {
+        const data = updateData[tenantId];
+        if (!data) continue;
+
+        const { error } = await supabase
+          .from("tenants")
+          .update({
+            name: data.name,
+            cpf: data.cpf
+          })
+          .eq("id", tenantId);
+
+        if (error) {
+          toast.error(`Erro ao atualizar ${data.name}: ${error.message}`);
+          continue;
+        }
+      }
+
+      toast.success(`${selectedTenants.length} inquilino(s) atualizado(s) com sucesso!`);
+      setSelectedTenants([]);
+      setUpdateData({});
+      setUpdateDialogOpen(false);
+      refetch?.();
+    } catch (err: any) {
+      toast.error("Erro ao processar atualização: " + err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -86,12 +149,101 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Contratos Ativos</h1>
           <p className="text-sm text-muted-foreground">{filtered?.length || 0} inquilinos</p>
         </div>
-        <TenantCreateDialog
-          open={open}
-          onOpenChange={setOpen}
-          properties={properties}
-          createTenant={createTenant}
-        />
+        <div className="flex gap-2">
+          <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Atualizar Dados
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Atualizar Dados de Inquilinos
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Selecione os inquilinos que deseja atualizar e edite os dados de nome e CPF.
+                </p>
+                
+                <div className="space-y-3 max-h-[400px] overflow-y-auto border rounded-lg p-4">
+                  {tenants?.map((tenant) => (
+                    <div key={tenant.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        checked={selectedTenants.includes(tenant.id)}
+                        onCheckedChange={() => handleSelectTenant(tenant.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground">Nome Completo</Label>
+                            <Input
+                              value={updateData[tenant.id]?.name || tenant.name || ""}
+                              onChange={(e) => handleUpdateData(tenant.id, "name", e.target.value)}
+                              disabled={!selectedTenants.includes(tenant.id)}
+                              className="text-sm"
+                              placeholder="Nome completo"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground">CPF</Label>
+                            <Input
+                              value={updateData[tenant.id]?.cpf || tenant.cpf || ""}
+                              onChange={(e) => handleUpdateData(tenant.id, "cpf", e.target.value)}
+                              disabled={!selectedTenants.includes(tenant.id)}
+                              className="text-sm"
+                              placeholder="000.000.000-00"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{tenant.property?.address} {tenant.house_number ? `- Casa ${tenant.house_number}` : ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <p className="text-sm font-medium">
+                    {selectedTenants.length} inquilino(s) selecionado(s)
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setUpdateDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={handleBulkUpdate} 
+                      disabled={selectedTenants.length === 0 || isUpdating}
+                      className="gap-2"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Atualizando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Atualizar Selecionados
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <TenantCreateDialog
+            open={open}
+            onOpenChange={setOpen}
+            properties={properties}
+            createTenant={createTenant}
+          />
+        </div>
       </div>
 
       {/* Search */}
