@@ -16,87 +16,27 @@ const SYSTEM_PROMPT = `Você é a assistente IA da imobiliária "Mesquita Imóve
 
 Sua função é ajudar o administrador com:
 - Consultas sobre inquilinos, contratos, pagamentos e vencimentos
-- Geração de mensagens informais e humanas para WhatsApp
-- Cobranças automáticas de aluguéis atrasados
+- Comprovantes pendentes de revisão (list_pending_receipts) e atribuir inquilino manualmente (assign_tenant_to_pending)
+- Listar recibos já gerados (list_saved_receipts)
+- Geração de mensagens informais e humanas para WhatsApp e cobrança de atrasados
 - Resumos de contratos
-- Sugestões inteligentes
-- Comandos rápidos: "cobrar atrasados", "listar vencimentos de hoje", "resumir contrato de X", etc.
 
-Use as ferramentas disponíveis para buscar dados reais do sistema antes de responder. Seja direta, simpática e profissional. Use emojis com moderação. Sempre responda em português brasileiro.`;
+Regras:
+- Sempre que o usuário falar de "comprovantes" ou "arquivos enviados", use list_pending_receipts.
+- Se o usuário disser algo como "esse comprovante é do João", chame assign_tenant_to_pending com o id do pendente e o nome do inquilino.
+- Use as ferramentas antes de responder. Seja direta, simpática, em português brasileiro.`;
 
 const tools = [
-  {
-    type: "function",
-    function: {
-      name: "list_tenants",
-      description: "Lista todos os inquilinos ativos com nome, telefone, valor do aluguel e dia de pagamento.",
-      parameters: { type: "object", properties: { status: { type: "string", enum: ["active", "inactive", "all"], description: "Filtro de status" } } },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_tenant_details",
-      description: "Busca detalhes completos de um inquilino pelo nome (busca parcial).",
-      parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "list_overdue_payments",
-      description: "Lista pagamentos atrasados (vencidos e não pagos).",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "list_due_today",
-      description: "Lista inquilinos com vencimento hoje ou nos próximos N dias.",
-      parameters: { type: "object", properties: { days_ahead: { type: "number", description: "Dias à frente (0=hoje)" } } },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "send_whatsapp_message",
-      description: "Envia mensagem via WhatsApp (Z-API) para um número. Use quando o usuário pedir para enviar/cobrar algo.",
-      parameters: {
-        type: "object",
-        properties: {
-          phone: { type: "string", description: "Telefone do destinatário (com DDD, ex: 5513988312733)" },
-          message: { type: "string", description: "Mensagem a enviar (tom humano e informal)" },
-        },
-        required: ["phone", "message"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "generate_charge_message",
-      description: "Gera (não envia) uma mensagem de cobrança humanizada para um inquilino com base nos dados.",
-      parameters: {
-        type: "object",
-        properties: {
-          tenant_name: { type: "string" },
-          amount: { type: "number" },
-          month: { type: "string", description: "Mês de referência" },
-          days_late: { type: "number" },
-        },
-        required: ["tenant_name", "amount"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "summarize_contract",
-      description: "Busca dados do contrato de um inquilino e retorna um resumo estruturado.",
-      parameters: { type: "object", properties: { tenant_name: { type: "string" } }, required: ["tenant_name"] },
-    },
-  },
+  { type: "function", function: { name: "list_tenants", description: "Lista inquilinos ativos.", parameters: { type: "object", properties: { status: { type: "string", enum: ["active", "inactive", "all"] } } } } },
+  { type: "function", function: { name: "get_tenant_details", description: "Detalhes de um inquilino pelo nome.", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } } },
+  { type: "function", function: { name: "list_overdue_payments", description: "Pagamentos atrasados.", parameters: { type: "object", properties: {} } } },
+  { type: "function", function: { name: "list_due_today", description: "Vencimentos hoje ou próximos N dias.", parameters: { type: "object", properties: { days_ahead: { type: "number" } } } } },
+  { type: "function", function: { name: "send_whatsapp_message", description: "Envia mensagem via WhatsApp (Z-API).", parameters: { type: "object", properties: { phone: { type: "string" }, message: { type: "string" } }, required: ["phone", "message"] } } },
+  { type: "function", function: { name: "generate_charge_message", description: "Gera mensagem de cobrança humanizada.", parameters: { type: "object", properties: { tenant_name: { type: "string" }, amount: { type: "number" }, month: { type: "string" }, days_late: { type: "number" } }, required: ["tenant_name", "amount"] } } },
+  { type: "function", function: { name: "summarize_contract", description: "Resumo do contrato de um inquilino.", parameters: { type: "object", properties: { tenant_name: { type: "string" } }, required: ["tenant_name"] } } },
+  { type: "function", function: { name: "list_pending_receipts", description: "Lista comprovantes pendentes de revisão (com payer_name, valor, status, tenant_id quando já vinculado).", parameters: { type: "object", properties: { include_resolved: { type: "boolean" } } } } },
+  { type: "function", function: { name: "assign_tenant_to_pending", description: "Vincula um inquilino a um comprovante pendente (por id do pendente e nome do inquilino).", parameters: { type: "object", properties: { pending_id: { type: "string" }, tenant_name: { type: "string" } }, required: ["pending_id", "tenant_name"] } } },
+  { type: "function", function: { name: "list_saved_receipts", description: "Lista recibos PDF já gerados e armazenados.", parameters: { type: "object", properties: { tenant_name: { type: "string" } } } } },
 ];
 
 async function execTool(name: string, args: any): Promise<any> {
@@ -110,16 +50,14 @@ async function execTool(name: string, args: any): Promise<any> {
       return { count: data?.length ?? 0, tenants: data };
     }
     if (name === "get_tenant_details") {
-      const { data, error } = await supabase
-        .from("tenants").select("*, properties(name,address)")
-        .ilike("name", `%${args.name}%`).limit(5);
+      const { data, error } = await supabase.from("tenants").select("*, properties(name,address)").ilike("name", `%${args.name}%`).limit(5);
       if (error) throw error;
       return { tenants: data };
     }
     if (name === "list_overdue_payments") {
       const today = new Date();
       const { data: tenants } = await supabase.from("tenants").select("id,name,phone,rent_amount,payment_day").eq("status", "active");
-      const { data: payments } = await supabase.from("payments").select("tenant_id,year,month,status,amount").eq("status", "paid");
+      const { data: payments } = await supabase.from("payments").select("tenant_id,year,month,status").eq("status", "paid");
       const overdue: any[] = [];
       for (const t of tenants ?? []) {
         const day = t.payment_day ?? 10;
@@ -143,9 +81,7 @@ async function execTool(name: string, args: any): Promise<any> {
       return { count: due.length, tenants: due };
     }
     if (name === "send_whatsapp_message") {
-      const { data, error } = await supabase.functions.invoke("zapi-send", {
-        body: { phone: args.phone, message: args.message },
-      });
+      const { data, error } = await supabase.functions.invoke("zapi-send", { body: { phone: args.phone, message: args.message } });
       if (error) throw error;
       return { success: true, result: data };
     }
@@ -156,12 +92,38 @@ async function execTool(name: string, args: any): Promise<any> {
     if (name === "summarize_contract") {
       const { data } = await supabase.from("tenants").select("*, properties(name,address)").ilike("name", `%${args.tenant_name}%`).limit(1).maybeSingle();
       if (!data) return { error: "Inquilino não encontrado" };
-      return {
-        nome: data.name, telefone: data.phone, cpf: data.cpf,
-        imovel: data.properties?.address ?? "—", casa: data.house_number,
-        aluguel: data.rent_amount, deposito: data.deposit, dia_pagamento: data.payment_day,
-        entrada: data.entry_date, ciclo: data.payment_cycle, observacoes: data.notes,
-      };
+      return { nome: data.name, telefone: data.phone, cpf: data.cpf, imovel: data.properties?.address ?? "—", casa: data.house_number, aluguel: data.rent_amount, deposito: data.deposit, dia_pagamento: data.payment_day, entrada: data.entry_date, ciclo: data.payment_cycle, observacoes: data.notes };
+    }
+    if (name === "list_pending_receipts") {
+      let q = supabase.from("whatsapp_pending_actions").select("id,action_type,status,tenant_id,proposed_data,confidence,created_at").order("created_at", { ascending: false }).limit(50);
+      if (!args.include_resolved) q = q.eq("status", "pending");
+      const { data, error } = await q;
+      if (error) throw error;
+      const tenantIds = [...new Set((data ?? []).map((d: any) => d.tenant_id).filter(Boolean))];
+      let tenantsMap: Record<string, string> = {};
+      if (tenantIds.length) {
+        const { data: ts } = await supabase.from("tenants").select("id,name").in("id", tenantIds);
+        tenantsMap = Object.fromEntries((ts ?? []).map((t: any) => [t.id, t.name]));
+      }
+      return { count: data?.length ?? 0, pending: (data ?? []).map((d: any) => ({ id: d.id, status: d.status, tenant: d.tenant_id ? tenantsMap[d.tenant_id] : null, payer_name: d.proposed_data?.payer_name, amount: d.proposed_data?.amount, date: d.proposed_data?.date, created_at: d.created_at })) };
+    }
+    if (name === "assign_tenant_to_pending") {
+      const { data: t } = await supabase.from("tenants").select("id,name").ilike("name", `%${args.tenant_name}%`).limit(1).maybeSingle();
+      if (!t) return { error: "Inquilino não encontrado" };
+      const { error } = await supabase.from("whatsapp_pending_actions").update({ tenant_id: t.id }).eq("id", args.pending_id);
+      if (error) throw error;
+      return { success: true, tenant: t.name, pending_id: args.pending_id, hint: "Inquilino vinculado. O usuário pode aprovar na tela para gerar o recibo." };
+    }
+    if (name === "list_saved_receipts") {
+      let q = supabase.from("documents").select("id,title,file_name,file_url,tenant_id,created_at").eq("category", "receipt").order("created_at", { ascending: false }).limit(50);
+      const { data } = await q;
+      let filtered = data ?? [];
+      if (args.tenant_name) {
+        const { data: ts } = await supabase.from("tenants").select("id,name").ilike("name", `%${args.tenant_name}%`);
+        const ids = new Set((ts ?? []).map((t: any) => t.id));
+        filtered = filtered.filter((d: any) => ids.has(d.tenant_id));
+      }
+      return { count: filtered.length, receipts: filtered };
     }
     return { error: "Tool não encontrada" };
   } catch (e: any) {
@@ -178,13 +140,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "conversation_id e message são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Salva mensagem do usuário
     await supabase.from("ai_messages").insert({ conversation_id, role: "user", content: message });
 
-    // Carrega histórico
-    const { data: history } = await supabase
-      .from("ai_messages").select("role,content,tool_calls,tool_call_id")
-      .eq("conversation_id", conversation_id).order("created_at", { ascending: true }).limit(50);
+    const { data: history } = await supabase.from("ai_messages").select("role,content,tool_calls,tool_call_id").eq("conversation_id", conversation_id).order("created_at", { ascending: true }).limit(50);
 
     const messages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
     for (const m of history ?? []) {
@@ -194,8 +152,7 @@ Deno.serve(async (req) => {
       messages.push(msg);
     }
 
-    // Loop de tool calling (até 5 iterações)
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -205,7 +162,7 @@ Deno.serve(async (req) => {
       if (!resp.ok) {
         const t = await resp.text();
         if (resp.status === 429) return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em instantes." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (resp.status === 402) return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Adicione créditos no workspace." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (resp.status === 402) return new Response(JSON.stringify({ error: "Créditos da IA esgotados." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         throw new Error(`AI gateway: ${resp.status} ${t}`);
       }
 
@@ -219,14 +176,12 @@ Deno.serve(async (req) => {
         for (const tc of choice.tool_calls) {
           const args = JSON.parse(tc.function.arguments || "{}");
           const result = await execTool(tc.function.name, args);
-          const toolMsg = { role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) };
-          messages.push(toolMsg);
+          messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
           await supabase.from("ai_messages").insert({ conversation_id, role: "tool", content: JSON.stringify(result), tool_call_id: tc.id });
         }
         continue;
       }
 
-      // Resposta final
       await supabase.from("ai_messages").insert({ conversation_id, role: "assistant", content: choice.content ?? "" });
       await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversation_id);
       return new Response(JSON.stringify({ reply: choice.content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
