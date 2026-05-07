@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Contratos", url: "/tenants", icon: FileText },
+  { title: "Importar Contrato", url: "/import-contract", icon: Upload },
   { title: "Ex-Inquilinos", url: "/former-tenants", icon: UserX },
   { title: "Atrasados", url: "/overdue", icon: AlertTriangle },
   { title: "Alertas", url: "/alerts", icon: Bell },
