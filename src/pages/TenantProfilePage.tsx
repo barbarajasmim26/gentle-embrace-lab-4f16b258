@@ -80,6 +80,74 @@ export default function TenantProfilePage() {
   const now = new Date();
   const month = now.getMonth() + 1;
 
+  const handleReloadContractCPF = async () => {
+    if (!documents?.length) {
+      toast.error("Nenhum contrato anexado.");
+      return;
+    }
+
+    const contracts = documents.filter((doc: any) => doc.category === "contract");
+    if (!contracts.length) {
+      toast.error("Nenhum contrato para processar.");
+      return;
+    }
+
+    toast.loading("Processando contratos...");
+    let updated = 0;
+    let failed = 0;
+
+    for (const contract of contracts) {
+      try {
+        // Get the file from storage
+        const { data: fileData, error: downloadErr } = await supabase.storage
+          .from("contracts")
+          .download(contract.file_url);
+
+        if (downloadErr) throw downloadErr;
+
+        // Convert to base64
+        const buffer = await fileData.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+        );
+
+        // Extract data from contract
+        const { data: extractedData, error: extractErr } = await supabase.functions.invoke(
+          "extract-contract",
+          { body: { pdf_base64: base64 } }
+        );
+
+        if (extractErr) throw extractErr;
+
+        // Update tenant with extracted CPF if found
+        if (extractedData?.cpf) {
+          const { error: updateErr } = await supabase
+            .from("tenants")
+            .update({ cpf: extractedData.cpf })
+            .eq("id", id);
+
+          if (!updateErr) {
+            updated++;
+          } else {
+            failed++;
+          }
+        }
+      } catch (err: any) {
+        console.error("Erro ao processar contrato:", err);
+        failed++;
+      }
+    }
+
+    // Dismiss loading toast and show result
+    toast.dismiss();
+    if (updated > 0) {
+      toast.success(`CPF atualizado de ${updated} contrato(s)!`);
+    }
+    if (failed > 0) {
+      toast.error(`Falha ao processar ${failed} contrato(s).`);
+    }
+  };
+
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
       <div className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -573,9 +641,14 @@ export default function TenantProfilePage() {
           <Card className="rounded-2xl">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-lg font-bold">Documentos e Contratos</CardTitle>
-              <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => setUploadOpen(true)}>
-                <Plus className="h-4 w-4" /> Adicionar
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => handleReloadContractCPF()} title="Recarregar e extrair CPF dos contratos">
+                  <RefreshCw className="h-4 w-4" /> Atualizar CPF
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg gap-1" onClick={() => setUploadOpen(true)}>
+                  <Plus className="h-4 w-4" /> Adicionar
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {!documents?.length ? (
