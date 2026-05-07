@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useProperties, useTenants } from "@/hooks/use-tenants";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,19 @@ export default function ReceiptPage() {
       return;
     }
     try {
+      // Save CPF if it was edited and different from the current one
+      if (cpfInput && cpfInput !== tenant?.cpf) {
+        const { error: updateErr } = await supabase
+          .from("tenants")
+          .update({ cpf: cpfInput })
+          .eq("id", selectedTenant);
+        if (updateErr) {
+          console.error("Erro ao salvar CPF:", updateErr);
+          toast.warning("Recibo gerado, mas CPF não foi salvo no perfil.");
+        } else {
+          toast.success("CPF atualizado no perfil do inquilino!");
+        }
+      }
       const pdf = await generateReceipt(previewData);
       const fileName = `recibo_${previewData.tenantName}_${monthName}_${year}.pdf`;
 
