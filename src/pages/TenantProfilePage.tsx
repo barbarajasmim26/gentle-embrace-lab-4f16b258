@@ -403,11 +403,9 @@ export default function TenantProfilePage() {
                 <Phone className="h-4 w-4" /> {tenant.phone}
               </div>
             )}
-            {tenant.cpf && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <FileText className="h-4 w-4" /> CPF: {tenant.cpf}
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 text-sm">
+              <FileText className="h-4 w-4" /> CPF: {tenant.cpf || "Não informado"}
+            </div>
           </div>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
