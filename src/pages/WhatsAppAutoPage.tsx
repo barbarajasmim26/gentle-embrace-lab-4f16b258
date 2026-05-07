@@ -182,11 +182,11 @@ export default function WhatsAppAutoPage() {
         const dateStr = data.date || new Date().toISOString().slice(0, 10);
         const d = new Date(dateStr);
         if (!isNaN(d.getTime()) && data.amount) {
-          const { error: payErr } = await supabase.from("payments").insert({
+          const { error: payErr } = await supabase.from("payments").upsert({
             tenant_id: p.tenant_id, year: d.getFullYear(), month: d.getMonth() + 1,
-            amount: data.amount, paid_at: dateStr, status: "paid",
-          });
-          if (payErr) { toast.error("Falha ao registrar pagamento"); return; }
+            amount: Number(data.amount), paid_at: dateStr, status: "paid",
+          }, { onConflict: "tenant_id,month,year" });
+          if (payErr) { toast.error("Falha ao registrar pagamento: " + (payErr.message || payErr)); return; }
           await generateAndStoreReceipt(p, p.tenant_id);
         }
       }

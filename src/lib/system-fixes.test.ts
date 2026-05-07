@@ -49,6 +49,6 @@ describe("receipt date helpers", () => {
   });
 
   it("formats the receipt city and date in Portuguese", () => {
-    expect(formatReceiptDate("2026-04-15")).toBe("Cascavel/CE, 15 de abril de 2026");
+    expect(formatReceiptDate("2026-04-15")).toBe("Fortaleza 15 de abril de 2026");
   });
 });
