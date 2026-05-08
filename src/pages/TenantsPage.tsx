@@ -210,7 +210,7 @@ export default function TenantsPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Selecione os inquilinos que deseja atualizar e edite os dados de nome e CPF.
+                  Selecione os inquilinos e edite Nome e CPF, ou use <strong>Extrair do contrato</strong> para preencher automaticamente via IA a partir de um PDF.
                 </p>
                 
                 <div className="space-y-3 max-h-[400px] overflow-y-auto border rounded-lg p-4">
