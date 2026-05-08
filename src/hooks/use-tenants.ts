@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isOverdue, isPaymentPaid, isNotApplicable } from "@/lib/payment-status";
 
 export interface Tenant {
   id: string;
@@ -145,6 +146,7 @@ export function useUpsertPayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["all-payments"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
   });
 }
@@ -153,7 +155,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const { data: tenants, error: te } = await supabase.from("tenants").select("id, status, rent_amount");
+      const { data: tenants, error: te } = await supabase.from("tenants").select("id, status, rent_amount, entry_date, payment_day, payment_cycle");
       if (te) throw te;
       const active = tenants?.filter((t) => t.status === "active") || [];
       const totalContracts = tenants?.length || 0;
@@ -161,15 +163,31 @@ export function useDashboardStats() {
       const monthlyRevenue = active.reduce((sum, t) => sum + Number(t.rent_amount || 0), 0);
 
       const now = new Date();
-      const { data: pendingPayments, error: pe } = await supabase
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      // Buscar todos os pagamentos do ano atual para calcular a inadimplência real baseada em competência
+      const { data: allPayments, error: pe } = await supabase
         .from("payments")
-        .select("amount, tenant:tenants(rent_amount)")
-        .eq("status", "pending")
-        .eq("month", now.getMonth() + 1)
-        .eq("year", now.getFullYear());
+        .select("tenant_id, month, year, status, amount")
+        .eq("year", year);
+      
       if (pe) throw pe;
 
-      const pendingAmount = pendingPayments?.reduce((sum, p) => sum + Number(p.amount || (p.tenant as any)?.rent_amount || 0), 0) || 0;
+      // Inadimplência real: Ativos que possuem meses de competência (até o atual) sem pagamento e que já venceram
+      let pendingAmount = 0;
+      active.forEach(t => {
+        for (let m = 1; m <= month; m++) {
+          const payment = allPayments?.find(p => p.tenant_id === t.id && p.month === m);
+          const isPaid = isPaymentPaid(payment?.status) || payment?.status === "deposit";
+          
+          if (!isPaid && !isNotApplicable(m, year, t.entry_date)) {
+            if (isOverdue(m, year, t.payment_day || 10, t.payment_cycle, now)) {
+              pendingAmount += Number(payment?.amount || t.rent_amount || 0);
+            }
+          }
+        }
+      });
 
       return { totalContracts, activeContracts, monthlyRevenue, pendingAmount };
     },

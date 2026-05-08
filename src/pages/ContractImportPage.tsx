@@ -60,7 +60,6 @@ export default function ContractImportPage() {
     if (!file) return;
     setExtracting(true);
     try {
-      // Read file as base64
       const buffer = await file.arrayBuffer();
       const base64 = btoa(
         new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
@@ -84,13 +83,12 @@ export default function ContractImportPage() {
         payment_day: d.payment_day || prev.payment_day,
         entry_date: d.entry_date || prev.entry_date,
         exit_date: d.exit_date || prev.exit_date,
-        address: d.address || "",
       }));
       setExtracted(true);
       toast.success("Dados extraídos do contrato com sucesso! Revise antes de salvar.");
     } catch (err: any) {
       console.error("Extraction error:", err);
-      toast.error("Erro ao extrair dados do PDF. Preencha manualmente.");
+      toast.error("Erro ao extrair dados do PDF. Verifique se a Edge Function está ativa.");
       setExtracted(true);
     } finally {
       setExtracting(false);
@@ -122,21 +120,26 @@ export default function ContractImportPage() {
 
       const result = await createTenant.mutateAsync(tenantData);
 
-      // Upload PDF as document
       if (file && result?.id) {
-        const filePath = `${result.id}/${file.name}`;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${result.id}/${fileName}`;
+        
         const { error: uploadError } = await supabase.storage.from("contracts").upload(filePath, file);
+        
         if (!uploadError) {
           await supabase.from("documents").insert({
             tenant_id: result.id,
+            title: "Contrato Original",
+            category: "contract",
             file_name: file.name,
             file_url: filePath,
-            file_type: "contract",
+            file_type: file.type,
           });
         }
       }
 
-      toast.success("Inquilino cadastrado e contrato anexado!");
+      toast.success("Inquilino cadastrado com sucesso!");
       navigate(`/tenants/${result.id}`);
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar.");
@@ -157,7 +160,6 @@ export default function ContractImportPage() {
         </div>
       </div>
 
-      {/* Upload Area */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 gap-4">
@@ -195,7 +197,6 @@ export default function ContractImportPage() {
         </CardContent>
       </Card>
 
-      {/* Form */}
       <Card>
         <CardHeader>
           <CardTitle>Dados do Inquilino</CardTitle>
@@ -217,7 +218,7 @@ export default function ContractImportPage() {
             </div>
             <div className="space-y-2">
               <Label>Telefone / WhatsApp</Label>
-              <Input value={form.phone} onChange={(e) => u("phone", e.target.value)} placeholder="Preencha manualmente" />
+              <Input value={form.phone} onChange={(e) => u("phone", e.target.value)} placeholder="Ex: 85999999999" />
             </div>
             <div className="space-y-2">
               <Label>Imóvel / Condomínio</Label>

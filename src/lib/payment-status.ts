@@ -9,29 +9,41 @@ export const PAYMENT_CYCLE_LABELS: Record<string, string> = {
 };
 
 /**
- * Retorna a data limite (vencimento) de um aluguel para um determinado mês/ano de referência.
- *
- * - antecipado: paga ANTES de morar — vence no dia X do PRÓPRIO mês de referência.
- * - postecipado: paga DEPOIS de morar — vence no dia X do mês SEGUINTE.
+ * Retorna a data limite (vencimento) de um aluguel para um determinado mês/ano de referência (competência).
+ * 
+ * - Competência: O mês que o inquilino está morando.
+ * - Vencimento: Quando ele deve pagar por esse mês.
+ * 
+ * Regra de Negócio:
+ * 1. Antecipado: Paga no dia X do PRÓPRIO mês de competência.
+ * 2. Postecipado: Paga no dia X do mês SEGUINTE ao de competência.
  */
 export function getDueDate(
-  refMonth: number, // 1..12
-  refYear: number,
+  refMonth: number, // 1..12 (Mês de Competência)
+  refYear: number,  // Ano de Competência
   paymentDay: number = 10,
   cycle: PaymentCycle = "postecipado",
 ): Date {
   const isAnticipated = cycle === "antecipado";
-  // refMonth é 1..12. Date espera mês 0-indexed.
-  // - antecipado (paga e mora): vence dia X do PRÓPRIO mês de referência → mês JS = refMonth - 1
-  // - postecipado (mora e paga): vence dia X do mês SEGUINTE → mês JS = refMonth (que equivale a refMonth+1 0-indexed)
+  
+  // Se for postecipado, o vencimento é no mês seguinte (refMonth)
+  // Se for antecipado, o vencimento é no próprio mês (refMonth - 1)
+  // Nota: Em JS, meses são 0-11.
   const dueMonthJs = isAnticipated ? refMonth - 1 : refMonth;
-  // Date com overflow se ajusta automaticamente (ex: mês 12 vira jan do ano seguinte)
+  
+  // O construtor de Date lida com overflow de meses (ex: mês 12 vira Janeiro do ano seguinte)
   return new Date(refYear, dueMonthJs, paymentDay);
 }
 
 /**
- * Decide se o pagamento de um mês está atrasado em relação à data atual.
- * Considera o ciclo (antecipado/postecipado).
+ * Decide se o pagamento de um mês de competência está atrasado.
+ * 
+ * @param refMonth Mês de competência (1-12)
+ * @param refYear Ano de competência
+ * @param paymentDay Dia do vencimento (padrão 10)
+ * @param cycle Ciclo de pagamento
+ * @param today Data de referência para o teste (padrão agora)
+ * @param toleranceDays Dias de tolerância antes de marcar como inadimplente (padrão 0)
  */
 export function isOverdue(
   refMonth: number,
@@ -39,17 +51,40 @@ export function isOverdue(
   paymentDay: number = 10,
   cycle: PaymentCycle = "postecipado",
   today: Date = new Date(),
+  toleranceDays: number = 0
 ): boolean {
   const due = getDueDate(refMonth, refYear, paymentDay, cycle);
-  // zera horas para comparar só por dia
+  
+  // Adiciona tolerância se houver
+  if (toleranceDays > 0) {
+    due.setDate(due.getDate() + toleranceDays);
+  }
+
+  // Zera as horas para comparar apenas as datas
   const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return todayMid > due;
+  const dueMid = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  
+  return todayMid > dueMid;
+}
+
+/**
+ * Verifica se um pagamento não é aplicável para um determinado mês/ano
+ * (ex: antes do inquilino entrar no imóvel).
+ */
+export function isNotApplicable(
+  refMonth: number,
+  refYear: number,
+  entryDate?: string | null
+): boolean {
+  if (!entryDate) return false;
+  
+  const entry = new Date(entryDate);
+  const refDate = new Date(refYear, refMonth - 1, 1);
+  const entryFirstDay = new Date(entry.getFullYear(), entry.getMonth(), 1);
+  
+  return refDate < entryFirstDay;
 }
 
 export function isPaymentPaid(status: string | null | undefined): boolean {
   return status === "paid" || status === "paid_late";
-}
-
-export function isPaymentApplicable(status: string | null | undefined): boolean {
-  return status !== "not_applicable";
 }
