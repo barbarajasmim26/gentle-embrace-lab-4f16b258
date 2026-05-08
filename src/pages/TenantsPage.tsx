@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users, RefreshCw, FileText } from "lucide-react";
+import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users, RefreshCw, FileText, Upload, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { isOverdue as checkOverdue, isPaymentPaid } from "@/lib/payment-status";
@@ -32,6 +32,50 @@ export default function TenantsPage() {
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [updateData, setUpdateData] = useState<Record<string, { name: string; cpf: string }>>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+
+  const handleExtractFromContract = async (tenantId: string, file: File) => {
+    setExtractingId(tenantId);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1] || "");
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("extract-contract", {
+        body: { pdf_base64: base64 },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const name = (data?.name || "").trim();
+      const cpf = (data?.cpf || "").trim();
+
+      if (!name && !cpf) {
+        toast.warning("Não foi possível extrair nome ou CPF deste contrato.");
+        return;
+      }
+
+      setSelectedTenants((prev) => (prev.includes(tenantId) ? prev : [...prev, tenantId]));
+      setUpdateData((prev) => ({
+        ...prev,
+        [tenantId]: {
+          name: name || prev[tenantId]?.name || tenants?.find((t) => t.id === tenantId)?.name || "",
+          cpf: cpf || prev[tenantId]?.cpf || tenants?.find((t) => t.id === tenantId)?.cpf || "",
+        },
+      }));
+      toast.success(`Dados extraídos: ${name || "(sem nome)"} ${cpf ? `- ${cpf}` : ""}`);
+    } catch (err: any) {
+      toast.error("Erro ao extrair contrato: " + (err.message || "desconhecido"));
+    } finally {
+      setExtractingId(null);
+    }
+  };
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -166,7 +210,7 @@ export default function TenantsPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Selecione os inquilinos que deseja atualizar e edite os dados de nome e CPF.
+                  Selecione os inquilinos e edite Nome e CPF, ou use <strong>Extrair do contrato</strong> para preencher automaticamente via IA a partir de um PDF.
                 </p>
                 
                 <div className="space-y-3 max-h-[400px] overflow-y-auto border rounded-lg p-4">
@@ -200,7 +244,29 @@ export default function TenantsPage() {
                             />
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">{tenant.property?.address} {tenant.house_number ? `- Casa ${tenant.house_number}` : ""}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">{tenant.property?.address} {tenant.house_number ? `- Casa ${tenant.house_number}` : ""}</p>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="hidden"
+                              disabled={extractingId === tenant.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleExtractFromContract(tenant.id, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border bg-background hover:bg-accent transition-colors">
+                              {extractingId === tenant.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Lendo contrato...</>
+                              ) : (
+                                <><Upload className="h-3 w-3" /> Extrair do contrato</>
+                              )}
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   ))}
