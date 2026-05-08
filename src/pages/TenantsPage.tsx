@@ -33,6 +33,117 @@ export default function TenantsPage() {
   const [updateData, setUpdateData] = useState<Record<string, { name: string; cpf: string }>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [tenantsWithoutContract, setTenantsWithoutContract] = useState<any[]>([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkResults, setBulkResults] = useState<Array<{ file: string; status: "ok" | "fail"; message: string }>>([]);
+
+  const loadTenantsWithoutContract = async () => {
+    if (!tenants) return;
+    const ids = tenants.map((t) => t.id);
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("tenant_id")
+      .in("tenant_id", ids)
+      .or("category.eq.contract,file_type.eq.contract");
+    const withContract = new Set((docs || []).map((d: any) => d.tenant_id));
+    setTenantsWithoutContract(tenants.filter((t) => !withContract.has(t.id)));
+  };
+
+  const openBulkDialog = async () => {
+    await loadTenantsWithoutContract();
+    setBulkResults([]);
+    setBulkOpen(true);
+  };
+
+  const normalize = (s: string) =>
+    (s || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
+
+  const matchTenant = (extracted: { name: string; cpf: string }, candidates: any[]) => {
+    const cpfDigits = (extracted.cpf || "").replace(/\D/g, "");
+    if (cpfDigits.length === 11) {
+      const byCpf = candidates.find((t) => (t.cpf || "").replace(/\D/g, "") === cpfDigits);
+      if (byCpf) return byCpf;
+    }
+    const exName = normalize(extracted.name);
+    if (!exName) return null;
+    // exact normalized match
+    const exact = candidates.find((t) => normalize(t.name) === exName);
+    if (exact) return exact;
+    // token overlap >= 2 tokens (first+last name)
+    const exTokens = exName.split(/\s+/).filter((w) => w.length > 2);
+    let best: { t: any; score: number } | null = null;
+    for (const t of candidates) {
+      const tTokens = normalize(t.name).split(/\s+/);
+      const overlap = exTokens.filter((w) => tTokens.includes(w)).length;
+      if (overlap >= 2 && (!best || overlap > best.score)) best = { t, score: overlap };
+    }
+    return best?.t || null;
+  };
+
+  const handleBulkUpload = async (files: FileList) => {
+    setBulkProcessing(true);
+    const results: typeof bulkResults = [];
+    let pool = [...tenantsWithoutContract];
+
+    for (const file of Array.from(files)) {
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(((r.result as string).split(",")[1]) || "");
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+
+        const { data, error } = await supabase.functions.invoke("extract-contract", {
+          body: { pdf_base64: base64 },
+        });
+        if (error || data?.error) throw new Error(error?.message || data?.error || "Falha na extração");
+
+        const matched = matchTenant({ name: data?.name || "", cpf: data?.cpf || "" }, pool);
+        if (!matched) {
+          results.push({ file: file.name, status: "fail", message: `Sem correspondência (${data?.name || "?"})` });
+          continue;
+        }
+
+        const filePath = `${matched.id}/${Date.now()}-${file.name}`;
+        const { error: upErr } = await supabase.storage.from("contracts").upload(filePath, file);
+        if (upErr) throw upErr;
+
+        await supabase.from("documents").insert({
+          tenant_id: matched.id,
+          file_name: file.name,
+          file_url: filePath,
+          file_type: "contract",
+          category: "contract",
+          title: `Contrato - ${matched.name}`,
+        });
+
+        const updates: any = {};
+        if (data?.name && !matched.name) updates.name = data.name;
+        if (data?.cpf && !matched.cpf) updates.cpf = data.cpf;
+        if (Object.keys(updates).length) {
+          await supabase.from("tenants").update(updates).eq("id", matched.id);
+        }
+
+        pool = pool.filter((t) => t.id !== matched.id);
+        results.push({ file: file.name, status: "ok", message: `→ ${matched.name}` });
+      } catch (err: any) {
+        results.push({ file: file.name, status: "fail", message: err.message || "Erro" });
+      }
+      setBulkResults([...results]);
+    }
+
+    setBulkProcessing(false);
+    await loadTenantsWithoutContract();
+    refetch?.();
+    toast.success(`${results.filter((r) => r.status === "ok").length}/${results.length} contratos vinculados`);
+  };
 
   const handleExtractFromContract = async (tenantId: string, file: File) => {
     setExtractingId(tenantId);
