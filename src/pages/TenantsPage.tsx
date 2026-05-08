@@ -244,7 +244,29 @@ export default function TenantsPage() {
                             />
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">{tenant.property?.address} {tenant.house_number ? `- Casa ${tenant.house_number}` : ""}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">{tenant.property?.address} {tenant.house_number ? `- Casa ${tenant.house_number}` : ""}</p>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="hidden"
+                              disabled={extractingId === tenant.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleExtractFromContract(tenant.id, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border bg-background hover:bg-accent transition-colors">
+                              {extractingId === tenant.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Lendo contrato...</>
+                              ) : (
+                                <><Upload className="h-3 w-3" /> Extrair do contrato</>
+                              )}
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   ))}
