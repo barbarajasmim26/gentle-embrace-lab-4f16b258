@@ -304,7 +304,83 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Contratos Ativos</h1>
           <p className="text-sm text-muted-foreground">{filtered?.length || 0} inquilinos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Dialog open={bulkOpen} onOpenChange={(o) => (o ? openBulkDialog() : setBulkOpen(false))}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Contratos (IA)
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Upload em Massa de Contratos
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-sm font-medium mb-2">
+                    {tenantsWithoutContract.length} inquilino(s) ativo(s) sem contrato:
+                  </p>
+                  {tenantsWithoutContract.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Todos os inquilinos já têm contrato anexado. 🎉</p>
+                  ) : (
+                    <ul className="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
+                      {tenantsWithoutContract.map((t) => (
+                        <li key={t.id}>
+                          • {t.name} {t.house_number ? `- Casa ${t.house_number}` : ""} ({t.property?.address || "sem endereço"})
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <label className={`block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent/50 transition ${bulkProcessing ? "opacity-50 pointer-events-none" : ""}`}>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    className="hidden"
+                    disabled={bulkProcessing || tenantsWithoutContract.length === 0}
+                    onChange={(e) => {
+                      if (e.target.files?.length) handleBulkUpload(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  {bulkProcessing ? (
+                    <div className="flex items-center justify-center gap-2 text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Processando contratos com IA...
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm font-medium">Clique para selecionar vários PDFs</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        A IA vai ler cada contrato, identificar o inquilino e anexar no perfil correto.
+                      </p>
+                    </>
+                  )}
+                </label>
+
+                {bulkResults.length > 0 && (
+                  <div className="space-y-1 max-h-60 overflow-y-auto border rounded-lg p-3">
+                    {bulkResults.map((r, i) => (
+                      <div key={i} className="text-xs flex gap-2">
+                        <span className={r.status === "ok" ? "text-success" : "text-destructive"}>
+                          {r.status === "ok" ? "✓" : "✗"}
+                        </span>
+                        <span className="font-mono truncate flex-1">{r.file}</span>
+                        <span className="text-muted-foreground">{r.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
