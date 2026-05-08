@@ -49,3 +49,7 @@ export function isOverdue(
 export function isPaymentPaid(status: string | null | undefined): boolean {
   return status === "paid" || status === "paid_late";
 }
+
+export function isPaymentApplicable(status: string | null | undefined): boolean {
+  return status !== "not_applicable";
+}

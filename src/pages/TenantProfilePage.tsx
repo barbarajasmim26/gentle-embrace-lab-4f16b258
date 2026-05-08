@@ -16,14 +16,14 @@ import { openWhatsApp, openWhatsAppChat, getMessageTemplates } from "@/lib/whats
 import { generateReceipt } from "@/lib/receipt-generator";
 import { isAbsoluteHttpUrl, parseStorageReference } from "@/lib/document-url";
 import { supabase } from "@/integrations/supabase/client";
-import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid } from "@/lib/payment-status";
+import { isOverdue, PAYMENT_CYCLE_LABELS, isPaymentPaid, isPaymentApplicable } from "@/lib/payment-status";
 import { calculateTenantFees } from "@/lib/fee-utils";
 import { useAppSettings, resolveFees } from "@/hooks/use-settings";
 import RenewContractDialog from "@/components/contracts/RenewContractDialog";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-type PaymentStatusType = "paid" | "paid_late" | "pending" | "deposit";
+type PaymentStatusType = "paid" | "paid_late" | "pending" | "deposit" | "not_applicable";
 
 const STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: any }> = {
   paid: { label: "Em dia", colorClass: "bg-success/10 text-success border-success/30", icon: CheckCircle2 },
@@ -31,6 +31,7 @@ const STATUS_CONFIG: Record<string, { label: string; colorClass: string; icon: a
   pending: { label: "Pend.", colorClass: "bg-muted text-muted-foreground border-border", icon: Clock },
   overdue: { label: "Atrasado", colorClass: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
   deposit: { label: "Caução", colorClass: "bg-primary/10 text-primary border-primary/30", icon: DollarSign },
+  not_applicable: { label: "Não aplicável", colorClass: "bg-slate-200/50 text-slate-600 border-slate-300/50", icon: AlertTriangle },
 };
 
 export default function TenantProfilePage() {
@@ -192,6 +193,14 @@ export default function TenantProfilePage() {
     return "pending";
   };
 
+  const shouldShowAsOverdue = (m: number) => {
+    const p = getPayment(m);
+    if (!p || p.status === "not_applicable") return false;
+    if (isPaymentPaid(p.status)) return false;
+    if (year !== currentYear) return false;
+    return isOverdue(m, year, tenant.payment_day || 10, tenant.payment_cycle, now);
+  };
+
   const calcFinalAmount = () => {
     const base = payCustomAmount ? Number(payCustomAmount) : rentAmount;
     if (payStatus === "paid" || payStatus === "pending" || payStatus === "deposit") return base;
@@ -238,7 +247,7 @@ export default function TenantProfilePage() {
         late_fee_percent: payStatus === "paid_late" ? Number(payLateFee) : 0,
         interest_percent: payStatus === "paid_late" ? Number(payInterest) : 0,
       });
-      const statusLabels: Record<string, string> = { paid: "pago em dia", paid_late: "pago com atraso", pending: "pendente", deposit: "caução" };
+      const statusLabels: Record<string, string> = { paid: "pago em dia", paid_late: "pago com atraso", pending: "pendente", deposit: "caução", not_applicable: "não aplicável" };
       toast.success(`${MONTHS[payMonth - 1]} marcado como ${statusLabels[payStatus]}!`);
       setPayDialogOpen(false);
     } catch (e: any) { toast.error(e.message); }
@@ -750,10 +759,13 @@ export default function TenantProfilePage() {
                 <Button variant={payStatus === "pending" ? "default" : "outline"} className="rounded-lg" onClick={() => setPayStatus("pending")}>
                   <XCircle className="mr-1 h-4 w-4" />Pendente
                 </Button>
+                <Button variant={payStatus === "not_applicable" ? "default" : "outline"} className={`rounded-lg col-span-2 ${payStatus === "not_applicable" ? "bg-slate-500 hover:bg-slate-600 text-white" : ""}`} onClick={() => setPayStatus("not_applicable")}>
+                  <AlertTriangle className="mr-1 h-4 w-4" />Não aplicável (ainda não mora)
+                </Button>
               </div>
             </div>
 
-            {payStatus !== "pending" && (
+            {payStatus !== "pending" && payStatus !== "not_applicable" && (
               <div>
                 <Label>Data do pagamento</Label>
                 <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
