@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users, RefreshCw, FileText } from "lucide-react";
+import { Plus, Search, Phone, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle, Building, ChevronDown, Users, RefreshCw, FileText, Upload, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { isOverdue as checkOverdue, isPaymentPaid } from "@/lib/payment-status";
