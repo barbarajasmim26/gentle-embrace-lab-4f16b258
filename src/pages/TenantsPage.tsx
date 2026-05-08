@@ -33,6 +33,117 @@ export default function TenantsPage() {
   const [updateData, setUpdateData] = useState<Record<string, { name: string; cpf: string }>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [tenantsWithoutContract, setTenantsWithoutContract] = useState<any[]>([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkResults, setBulkResults] = useState<Array<{ file: string; status: "ok" | "fail"; message: string }>>([]);
+
+  const loadTenantsWithoutContract = async () => {
+    if (!tenants) return;
+    const ids = tenants.map((t) => t.id);
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("tenant_id")
+      .in("tenant_id", ids)
+      .or("category.eq.contract,file_type.eq.contract");
+    const withContract = new Set((docs || []).map((d: any) => d.tenant_id));
+    setTenantsWithoutContract(tenants.filter((t) => !withContract.has(t.id)));
+  };
+
+  const openBulkDialog = async () => {
+    await loadTenantsWithoutContract();
+    setBulkResults([]);
+    setBulkOpen(true);
+  };
+
+  const normalize = (s: string) =>
+    (s || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .trim();
+
+  const matchTenant = (extracted: { name: string; cpf: string }, candidates: any[]) => {
+    const cpfDigits = (extracted.cpf || "").replace(/\D/g, "");
+    if (cpfDigits.length === 11) {
+      const byCpf = candidates.find((t) => (t.cpf || "").replace(/\D/g, "") === cpfDigits);
+      if (byCpf) return byCpf;
+    }
+    const exName = normalize(extracted.name);
+    if (!exName) return null;
+    // exact normalized match
+    const exact = candidates.find((t) => normalize(t.name) === exName);
+    if (exact) return exact;
+    // token overlap >= 2 tokens (first+last name)
+    const exTokens = exName.split(/\s+/).filter((w) => w.length > 2);
+    let best: { t: any; score: number } | null = null;
+    for (const t of candidates) {
+      const tTokens = normalize(t.name).split(/\s+/);
+      const overlap = exTokens.filter((w) => tTokens.includes(w)).length;
+      if (overlap >= 2 && (!best || overlap > best.score)) best = { t, score: overlap };
+    }
+    return best?.t || null;
+  };
+
+  const handleBulkUpload = async (files: FileList) => {
+    setBulkProcessing(true);
+    const results: typeof bulkResults = [];
+    let pool = [...tenantsWithoutContract];
+
+    for (const file of Array.from(files)) {
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(((r.result as string).split(",")[1]) || "");
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+
+        const { data, error } = await supabase.functions.invoke("extract-contract", {
+          body: { pdf_base64: base64 },
+        });
+        if (error || data?.error) throw new Error(error?.message || data?.error || "Falha na extração");
+
+        const matched = matchTenant({ name: data?.name || "", cpf: data?.cpf || "" }, pool);
+        if (!matched) {
+          results.push({ file: file.name, status: "fail", message: `Sem correspondência (${data?.name || "?"})` });
+          continue;
+        }
+
+        const filePath = `${matched.id}/${Date.now()}-${file.name}`;
+        const { error: upErr } = await supabase.storage.from("contracts").upload(filePath, file);
+        if (upErr) throw upErr;
+
+        await supabase.from("documents").insert({
+          tenant_id: matched.id,
+          file_name: file.name,
+          file_url: filePath,
+          file_type: "contract",
+          category: "contract",
+          title: `Contrato - ${matched.name}`,
+        });
+
+        const updates: any = {};
+        if (data?.name && !matched.name) updates.name = data.name;
+        if (data?.cpf && !matched.cpf) updates.cpf = data.cpf;
+        if (Object.keys(updates).length) {
+          await supabase.from("tenants").update(updates).eq("id", matched.id);
+        }
+
+        pool = pool.filter((t) => t.id !== matched.id);
+        results.push({ file: file.name, status: "ok", message: `→ ${matched.name}` });
+      } catch (err: any) {
+        results.push({ file: file.name, status: "fail", message: err.message || "Erro" });
+      }
+      setBulkResults([...results]);
+    }
+
+    setBulkProcessing(false);
+    await loadTenantsWithoutContract();
+    refetch?.();
+    toast.success(`${results.filter((r) => r.status === "ok").length}/${results.length} contratos vinculados`);
+  };
 
   const handleExtractFromContract = async (tenantId: string, file: File) => {
     setExtractingId(tenantId);
@@ -193,7 +304,83 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Contratos Ativos</h1>
           <p className="text-sm text-muted-foreground">{filtered?.length || 0} inquilinos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Dialog open={bulkOpen} onOpenChange={(o) => (o ? openBulkDialog() : setBulkOpen(false))}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Contratos (IA)
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Upload em Massa de Contratos
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-sm font-medium mb-2">
+                    {tenantsWithoutContract.length} inquilino(s) ativo(s) sem contrato:
+                  </p>
+                  {tenantsWithoutContract.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Todos os inquilinos já têm contrato anexado. 🎉</p>
+                  ) : (
+                    <ul className="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
+                      {tenantsWithoutContract.map((t) => (
+                        <li key={t.id}>
+                          • {t.name} {t.house_number ? `- Casa ${t.house_number}` : ""} ({t.property?.address || "sem endereço"})
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <label className={`block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent/50 transition ${bulkProcessing ? "opacity-50 pointer-events-none" : ""}`}>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    multiple
+                    className="hidden"
+                    disabled={bulkProcessing || tenantsWithoutContract.length === 0}
+                    onChange={(e) => {
+                      if (e.target.files?.length) handleBulkUpload(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  {bulkProcessing ? (
+                    <div className="flex items-center justify-center gap-2 text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Processando contratos com IA...
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm font-medium">Clique para selecionar vários PDFs</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        A IA vai ler cada contrato, identificar o inquilino e anexar no perfil correto.
+                      </p>
+                    </>
+                  )}
+                </label>
+
+                {bulkResults.length > 0 && (
+                  <div className="space-y-1 max-h-60 overflow-y-auto border rounded-lg p-3">
+                    {bulkResults.map((r, i) => (
+                      <div key={i} className="text-xs flex gap-2">
+                        <span className={r.status === "ok" ? "text-success" : "text-destructive"}>
+                          {r.status === "ok" ? "✓" : "✗"}
+                        </span>
+                        <span className="font-mono truncate flex-1">{r.file}</span>
+                        <span className="text-muted-foreground">{r.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
