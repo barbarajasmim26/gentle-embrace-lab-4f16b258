@@ -32,6 +32,50 @@ export default function TenantsPage() {
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [updateData, setUpdateData] = useState<Record<string, { name: string; cpf: string }>>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+
+  const handleExtractFromContract = async (tenantId: string, file: File) => {
+    setExtractingId(tenantId);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1] || "");
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("extract-contract", {
+        body: { pdf_base64: base64 },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const name = (data?.name || "").trim();
+      const cpf = (data?.cpf || "").trim();
+
+      if (!name && !cpf) {
+        toast.warning("Não foi possível extrair nome ou CPF deste contrato.");
+        return;
+      }
+
+      setSelectedTenants((prev) => (prev.includes(tenantId) ? prev : [...prev, tenantId]));
+      setUpdateData((prev) => ({
+        ...prev,
+        [tenantId]: {
+          name: name || prev[tenantId]?.name || tenants?.find((t) => t.id === tenantId)?.name || "",
+          cpf: cpf || prev[tenantId]?.cpf || tenants?.find((t) => t.id === tenantId)?.cpf || "",
+        },
+      }));
+      toast.success(`Dados extraídos: ${name || "(sem nome)"} ${cpf ? `- ${cpf}` : ""}`);
+    } catch (err: any) {
+      toast.error("Erro ao extrair contrato: " + (err.message || "desconhecido"));
+    } finally {
+      setExtractingId(null);
+    }
+  };
 
   const now = new Date();
   const month = now.getMonth() + 1;
