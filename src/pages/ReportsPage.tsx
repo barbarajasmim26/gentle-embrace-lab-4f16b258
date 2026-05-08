@@ -20,7 +20,13 @@ export default function ReportsPage() {
   const totalProperties = new Set(activeTenants.map(t => t.property_id).filter(Boolean)).size;
   const expectedMonthly = activeTenants.reduce((sum, t) => sum + Number(t.rent_amount), 0);
 
+  // Começar a contar a partir de março (mês 3)
+  const START_MONTH = 3; // Março
   const monthlyData = MONTHS_PT.map((m, i) => {
+    // Ignorar janeiro e fevereiro
+    if (i + 1 < START_MONTH) {
+      return { month: m, monthFull: MONTHS_FULL[i], received: 0, paidCount: 0, pending: 0, expected: expectedMonthly };
+    }
     const monthPayments = payments?.filter((p) => p.month === i + 1 && (p.status === "paid" || p.status === "paid_late")) || [];
     const received = monthPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const paidCount = monthPayments.length;
@@ -28,8 +34,10 @@ export default function ReportsPage() {
     return { month: m, monthFull: MONTHS_FULL[i], received, paidCount, pending, expected: expectedMonthly };
   });
 
-  const totalReceived = monthlyData.reduce((sum, m) => sum + m.received, 0);
-  const avgMonthly = totalReceived / (new Date().getMonth() + 1);
+  // Calcular apenas a partir de março
+  const monthsWithData = monthlyData.filter((_, i) => i + 1 >= START_MONTH);
+  const totalReceived = monthsWithData.reduce((sum, m) => sum + m.received, 0);
+  const avgMonthly = monthsWithData.length > 0 ? totalReceived / monthsWithData.length : 0;
   const occupancyRate = activeTenants.length > 0 ? Math.round((activeTenants.length / (tenants?.length || 1)) * 100) : 0;
   
   // Contracts expiring within 30 days
@@ -71,6 +79,8 @@ export default function ReportsPage() {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     monthlyData.forEach((m, i) => {
+      // Pular janeiro e fevereiro no PDF
+      if (i + 1 < START_MONTH) return;
       if (i % 2 === 0) { doc.setFillColor(245, 247, 250); doc.rect(margin, y, pw - margin * 2, 7, "F"); }
       doc.text(m.monthFull, margin + 4, y + 5);
       doc.text(`R$ ${m.received.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, margin + 60, y + 5);
