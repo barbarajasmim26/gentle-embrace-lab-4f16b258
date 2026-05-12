@@ -4,13 +4,13 @@ import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, usePropertie
 import { useDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle, Cloud } from "lucide-react";
 import { toast } from "sonner";
 import { openWhatsAppChat } from "@/lib/whatsapp";
 import { parseStorageReference, isAbsoluteHttpUrl } from "@/lib/document-url";
@@ -72,8 +72,19 @@ export default function TenantProfilePage() {
 
   const now = new Date();
 
+  // Extrair link do iCloud das notas se existir
+  const extractICloudLink = (notes: string | null) => {
+    if (!notes) return "";
+    const match = notes.match(/\[Link iCloud\/Pages\]: (https:\/\/\S+)/);
+    return match ? match[1] : "";
+  };
+
   useEffect(() => {
     if (tenant) {
+      const icloudLink = extractICloudLink(tenant.notes);
+      // Limpar o link das notas para o formulário de edição
+      const cleanNotes = tenant.notes?.replace(/\n\n\[Link iCloud\/Pages\]: https:\/\/\S+/, "").trim() || "";
+      
       setEditForm({
         name: tenant.name,
         phone: tenant.phone || "",
@@ -83,8 +94,9 @@ export default function TenantProfilePage() {
         payment_day: String(tenant.payment_day || 10),
         payment_cycle: tenant.payment_cycle || "postecipado",
         entry_date: tenant.entry_date || "",
-        notes: tenant.notes || "",
-        property_id: tenant.property_id || ""
+        notes: cleanNotes,
+        property_id: tenant.property_id || "",
+        icloud_link: icloudLink
       });
     }
   }, [tenant]);
@@ -96,6 +108,7 @@ export default function TenantProfilePage() {
   );
   if (!tenant) return <p className="p-6">Inquilino não encontrado.</p>;
 
+  const icloudLink = extractICloudLink(tenant.notes);
   const rentAmount = Number(tenant.rent_amount);
 
   const getPayment = (m: number) => payments?.find((p) => p.month === m);
@@ -168,9 +181,14 @@ export default function TenantProfilePage() {
 
   const handleUpdateTenant = async () => {
     try {
+      const finalNotes = editForm.icloud_link 
+        ? `${editForm.notes || ""}\n\n[Link iCloud/Pages]: ${editForm.icloud_link}`.trim()
+        : editForm.notes;
+
       await updateTenant.mutateAsync({
         id: id!,
         ...editForm,
+        notes: finalNotes,
         rent_amount: Number(editForm.rent_amount),
         payment_day: Number(editForm.payment_day)
       });
@@ -246,6 +264,15 @@ export default function TenantProfilePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {icloudLink && (
+            <Button 
+              variant="outline" 
+              className="rounded-xl bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" 
+              onClick={() => window.open(icloudLink, "_blank")}
+            >
+              <Cloud className="mr-2 h-4 w-4" /> Abrir no Pages
+            </Button>
+          )}
           <Button variant="outline" className="rounded-xl" onClick={() => setUploadOpen(true)}>
             <Upload className="mr-2 h-4 w-4" /> Enviar Documento
           </Button>
@@ -369,7 +396,7 @@ export default function TenantProfilePage() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar Perfil do Inquilino</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="col-span-2 space-y-2">
@@ -419,6 +446,17 @@ export default function TenantProfilePage() {
               <Label>Data de Entrada</Label>
               <Input type="date" value={editForm.entry_date} onChange={(e) => setEditForm({...editForm, entry_date: e.target.value})} />
             </div>
+            
+            <div className="col-span-2 p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-2">
+              <Label className="text-blue-700 flex items-center gap-2"><Cloud className="h-4 w-4" /> Link do Contrato (iCloud/Pages)</Label>
+              <Input 
+                placeholder="https://www.icloud.com/pages/..." 
+                value={editForm.icloud_link} 
+                onChange={(e) => setEditForm({...editForm, icloud_link: e.target.value})}
+                className="bg-white border-blue-200"
+              />
+            </div>
+
             <div className="col-span-2 space-y-2">
               <Label>Notas / Observações</Label>
               <Textarea value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} />

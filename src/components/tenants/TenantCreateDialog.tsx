@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Plus, Cloud } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -19,22 +19,27 @@ export default function TenantCreateDialog({ open, onOpenChange, properties, cre
   const [form, setForm] = useState({
     name: "", phone: "", house_number: "", rent_amount: "", deposit: "",
     payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "",
-    payment_cycle: "postecipado",
+    payment_cycle: "postecipado", icloud_link: "",
   });
 
   const handleCreate = async () => {
     if (!form.name || !form.rent_amount) { toast.error("Nome e valor são obrigatórios"); return; }
     try {
+      // Concatenar link do iCloud nas notas caso o campo de banco não exista ainda, ou usar se existir
+      const finalNotes = form.icloud_link 
+        ? `${form.notes || ""}\n\n[Link iCloud/Pages]: ${form.icloud_link}`.trim()
+        : form.notes;
+
       await createTenant.mutateAsync({
         name: form.name, phone: form.phone || null, house_number: form.house_number || null,
         rent_amount: parseFloat(form.rent_amount), deposit: form.deposit ? parseFloat(form.deposit) : null,
         payment_day: parseInt(form.payment_day) || 10, entry_date: form.entry_date || null,
         exit_date: form.exit_date || null, property_id: form.property_id || null, cpf: form.cpf || null,
-        notes: form.notes || null, status: "active", payment_cycle: form.payment_cycle,
+        notes: finalNotes || null, status: "active", payment_cycle: form.payment_cycle,
       });
       toast.success("Inquilino criado!");
       onOpenChange(false);
-      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "", payment_cycle: "postecipado" });
+      setForm({ name: "", phone: "", house_number: "", rent_amount: "", deposit: "", payment_day: "10", entry_date: "", exit_date: "", property_id: "", cpf: "", notes: "", payment_cycle: "postecipado", icloud_link: "" });
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -60,6 +65,18 @@ export default function TenantCreateDialog({ open, onOpenChange, properties, cre
             <div><Label>Aluguel (R$) *</Label><Input type="number" value={form.rent_amount} onChange={(e) => setForm({ ...form, rent_amount: e.target.value })} /></div>
             <div><Label>Caução (R$)</Label><Input type="number" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} /></div>
           </div>
+          
+          <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-2">
+            <Label className="text-blue-700 flex items-center gap-2"><Cloud className="h-4 w-4" /> Link do Contrato (iCloud/Pages)</Label>
+            <Input 
+              placeholder="https://www.icloud.com/pages/..." 
+              value={form.icloud_link} 
+              onChange={(e) => setForm({ ...form, icloud_link: e.target.value })}
+              className="bg-white border-blue-200"
+            />
+            <p className="text-[10px] text-blue-500 italic">Dica: Compartilhe o arquivo no Pages e cole o link aqui para acesso rápido.</p>
+          </div>
+
           <div><Label>Dia do Pagamento</Label><Input type="number" min={1} max={31} value={form.payment_day} onChange={(e) => setForm({ ...form, payment_day: e.target.value })} /></div>
           <div><Label>Ciclo de Pagamento</Label>
             <Select value={form.payment_cycle} onValueChange={(v) => setForm({ ...form, payment_cycle: v })}>
