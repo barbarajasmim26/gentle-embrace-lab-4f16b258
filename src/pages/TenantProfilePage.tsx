@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTenant, usePayments, useUpdateTenant, useUpsertPayment, useProperties } from "@/hooks/use-tenants";
 import { useDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/use-documents";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { openWhatsAppChat } from "@/lib/whatsapp";
@@ -71,6 +71,23 @@ export default function TenantProfilePage() {
   const [renewOpen, setRenewOpen] = useState(false);
 
   const now = new Date();
+
+  useEffect(() => {
+    if (tenant) {
+      setEditForm({
+        name: tenant.name,
+        phone: tenant.phone || "",
+        cpf: tenant.cpf || "",
+        house_number: tenant.house_number || "",
+        rent_amount: String(tenant.rent_amount),
+        payment_day: String(tenant.payment_day || 10),
+        payment_cycle: tenant.payment_cycle || "postecipado",
+        entry_date: tenant.entry_date || "",
+        notes: tenant.notes || "",
+        property_id: tenant.property_id || ""
+      });
+    }
+  }, [tenant]);
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
@@ -146,6 +163,19 @@ export default function TenantProfilePage() {
       });
       toast.success("Pagamento atualizado!");
       setPayDialogOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleUpdateTenant = async () => {
+    try {
+      await updateTenant.mutateAsync({
+        id: id!,
+        ...editForm,
+        rent_amount: Number(editForm.rent_amount),
+        payment_day: Number(editForm.payment_day)
+      });
+      toast.success("Perfil atualizado!");
+      setEditOpen(false);
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -337,6 +367,71 @@ export default function TenantProfilePage() {
            </Card>
         </div>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader><DialogTitle>Editar Perfil do Inquilino</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="col-span-2 space-y-2">
+              <Label>Nome Completo</Label>
+              <Input value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>CPF</Label>
+              <Input value={editForm.cpf} onChange={(e) => setEditForm({...editForm, cpf: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone</Label>
+              <Input value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Imóvel</Label>
+              <Select value={editForm.property_id} onValueChange={(v) => setEditForm({...editForm, property_id: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {properties?.map(p => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Casa Nº</Label>
+              <Input value={editForm.house_number} onChange={(e) => setEditForm({...editForm, house_number: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Valor Aluguel</Label>
+              <Input type="number" value={editForm.rent_amount} onChange={(e) => setEditForm({...editForm, rent_amount: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Dia Vencimento</Label>
+              <Input type="number" value={editForm.payment_day} onChange={(e) => setEditForm({...editForm, payment_day: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Ciclo de Pagamento</Label>
+              <Select value={editForm.payment_cycle} onValueChange={(v) => setEditForm({...editForm, payment_cycle: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="antecipado">Antecipado (Paga e Mora)</SelectItem>
+                  <SelectItem value="postecipado">Postecipado (Mora e Paga)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Entrada</Label>
+              <Input type="date" value={editForm.entry_date} onChange={(e) => setEditForm({...editForm, entry_date: e.target.value})} />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Notas / Observações</Label>
+              <Textarea value={editForm.notes} onChange={(e) => setEditForm({...editForm, notes: e.target.value})} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button onClick={handleUpdateTenant} disabled={updateTenant.isPending}>
+              {updateTenant.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent>
