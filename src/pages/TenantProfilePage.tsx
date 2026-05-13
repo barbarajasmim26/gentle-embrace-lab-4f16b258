@@ -532,11 +532,81 @@ export default function TenantProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo de Pagamento */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="sm:max-w-[440px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              Registrar Pagamento — {MONTHS[payMonth - 1]}/{year}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={payStatus} onValueChange={(v: any) => setPayStatus(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Pago em Dia</SelectItem>
+                  <SelectItem value="paid_late">Pago com Atraso (Multa/Juros)</SelectItem>
+                  <SelectItem value="deposit">Caução</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(payStatus === "paid" || payStatus === "paid_late" || payStatus === "deposit") && (
+              <div className="space-y-2">
+                <Label>Data do Pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+            )}
+
+            {payStatus === "paid_late" && (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-destructive/5 rounded-xl border border-destructive/10">
+                <div className="space-y-1">
+                  <Label className="text-xs">Multa (%)</Label>
+                  <Input type="number" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Juros/mês (%)</Label>
+                  <Input type="number" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Valor Customizado (Opcional)</Label>
+              <Input
+                type="number"
+                placeholder={`Base: R$ ${rentAmount.toFixed(2)}`}
+                value={payCustomAmount}
+                onChange={(e) => setPayCustomAmount(e.target.value)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <span className="font-bold text-emerald-700">Total</span>
+              <span className="text-xl font-black text-emerald-700">
+                R$ {calcFinalAmount().toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancelar</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={confirmPayment} disabled={upsertPayment.isPending}>
+              {upsertPayment.isPending ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RenewContractDialog
         open={renewOpen}
         onOpenChange={setRenewOpen}
-        tenantId={id!}
-        onSuccess={() => refetchDocs()}
+        tenant={tenant}
       />
     </div>
   );
