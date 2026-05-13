@@ -312,6 +312,7 @@ export default function TenantProfilePage() {
               <RefreshCw className="mr-2 h-4 w-4" /> Reativar Inquilino
             </Button>
           )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
