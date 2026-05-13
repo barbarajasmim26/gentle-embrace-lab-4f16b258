@@ -283,7 +283,35 @@ export default function TenantProfilePage() {
           <Button className="rounded-xl" onClick={() => setEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4" /> Editar Perfil
           </Button>
-        </div>
+          {tenant.status === "active" ? (
+            <Button
+              variant="outline"
+              className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={async () => {
+                if (!confirm(`Marcar ${tenant.name} como ex-inquilino?`)) return;
+                try {
+                  await updateTenant.mutateAsync({ id: id!, status: "former", exit_date: new Date().toISOString().split("T")[0] } as any);
+                  toast.success("Movido para ex-inquilinos.");
+                  navigate("/former-tenants");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <UserMinus className="mr-2 h-4 w-4" /> Marcar como Ex-Inquilino
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={async () => {
+                try {
+                  await updateTenant.mutateAsync({ id: id!, status: "active" } as any);
+                  toast.success("Reativado como inquilino ativo.");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Reativar Inquilino
+            </Button>
+          )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
