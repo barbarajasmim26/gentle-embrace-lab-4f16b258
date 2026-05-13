@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle, Cloud } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle, Cloud, UserMinus } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { openWhatsAppChat } from "@/lib/whatsapp";
 import { parseStorageReference, isAbsoluteHttpUrl } from "@/lib/document-url";
@@ -282,6 +283,35 @@ export default function TenantProfilePage() {
           <Button className="rounded-xl" onClick={() => setEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4" /> Editar Perfil
           </Button>
+          {tenant.status === "active" ? (
+            <Button
+              variant="outline"
+              className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={async () => {
+                if (!confirm(`Marcar ${tenant.name} como ex-inquilino?`)) return;
+                try {
+                  await updateTenant.mutateAsync({ id: id!, status: "former", exit_date: new Date().toISOString().split("T")[0] } as any);
+                  toast.success("Movido para ex-inquilinos.");
+                  navigate("/former-tenants");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <UserMinus className="mr-2 h-4 w-4" /> Marcar como Ex-Inquilino
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={async () => {
+                try {
+                  await updateTenant.mutateAsync({ id: id!, status: "active" } as any);
+                  toast.success("Reativado como inquilino ativo.");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Reativar Inquilino
+            </Button>
+          )}
         </div>
       </div>
 
@@ -502,11 +532,81 @@ export default function TenantProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Diálogo de Pagamento */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="sm:max-w-[440px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              Registrar Pagamento — {MONTHS[payMonth - 1]}/{year}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={payStatus} onValueChange={(v: any) => setPayStatus(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Pago em Dia</SelectItem>
+                  <SelectItem value="paid_late">Pago com Atraso (Multa/Juros)</SelectItem>
+                  <SelectItem value="deposit">Caução</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(payStatus === "paid" || payStatus === "paid_late" || payStatus === "deposit") && (
+              <div className="space-y-2">
+                <Label>Data do Pagamento</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+            )}
+
+            {payStatus === "paid_late" && (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-destructive/5 rounded-xl border border-destructive/10">
+                <div className="space-y-1">
+                  <Label className="text-xs">Multa (%)</Label>
+                  <Input type="number" value={payLateFee} onChange={(e) => setPayLateFee(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Juros/mês (%)</Label>
+                  <Input type="number" value={payInterest} onChange={(e) => setPayInterest(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Valor Customizado (Opcional)</Label>
+              <Input
+                type="number"
+                placeholder={`Base: R$ ${rentAmount.toFixed(2)}`}
+                value={payCustomAmount}
+                onChange={(e) => setPayCustomAmount(e.target.value)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+              <span className="font-bold text-emerald-700">Total</span>
+              <span className="text-xl font-black text-emerald-700">
+                R$ {calcFinalAmount().toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancelar</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={confirmPayment} disabled={upsertPayment.isPending}>
+              {upsertPayment.isPending ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RenewContractDialog
         open={renewOpen}
         onOpenChange={setRenewOpen}
-        tenantId={id!}
-        onSuccess={() => refetchDocs()}
+        tenant={tenant}
       />
     </div>
   );
