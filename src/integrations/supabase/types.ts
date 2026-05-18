@@ -283,48 +283,42 @@ export type Database = {
       whatsapp_config: {
         Row: {
           auto_approve_payments: boolean
-          auto_approve_profile: boolean
           auto_send_receipt: boolean
-          business_phone: string | null
           connection_status: string
           created_at: string
           id: string
+          instance_name: string | null
+          last_error_message: string | null
           last_status_check: string | null
           last_webhook_at: string | null
-          phone_number_id: string | null
-          provider: string
           qr_code: string | null
           updated_at: string
           webhook_verified: boolean
         }
         Insert: {
           auto_approve_payments?: boolean
-          auto_approve_profile?: boolean
           auto_send_receipt?: boolean
-          business_phone?: string | null
           connection_status?: string
           created_at?: string
           id?: string
+          instance_name?: string | null
+          last_error_message?: string | null
           last_status_check?: string | null
           last_webhook_at?: string | null
-          phone_number_id?: string | null
-          provider?: string
           qr_code?: string | null
           updated_at?: string
           webhook_verified?: boolean
         }
         Update: {
           auto_approve_payments?: boolean
-          auto_approve_profile?: boolean
           auto_send_receipt?: boolean
-          business_phone?: string | null
           connection_status?: string
           created_at?: string
           id?: string
+          instance_name?: string | null
+          last_error_message?: string | null
           last_status_check?: string | null
           last_webhook_at?: string | null
-          phone_number_id?: string | null
-          provider?: string
           qr_code?: string | null
           updated_at?: string
           webhook_verified?: boolean
@@ -386,15 +380,7 @@ export type Database = {
           to_phone?: string | null
           wa_message_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_messages_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       whatsapp_pending_actions: {
         Row: {
@@ -439,22 +425,7 @@ export type Database = {
           tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_pending_actions_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "whatsapp_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_pending_actions_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
