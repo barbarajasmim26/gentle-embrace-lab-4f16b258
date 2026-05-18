@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -20,9 +20,15 @@ import WhatsAppPage from "./pages/WhatsAppPage";
 import WhatsAppAutoPage from "./pages/WhatsAppAutoPage";
 import ContractImportPage from "./pages/ContractImportPage";
 import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30000,
+    },
+  },
+});
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -48,29 +54,31 @@ function AuthenticatedApp() {
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/receipt" element={<ReceiptPage />} />
+        <Route path="/receipts" element={<ReceiptPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/whatsapp" element={<WhatsAppPage />} />
-        <Route path="/ai-assistant" element={<WhatsAppAutoPage />} />
-        <Route path="/import-contract" element={<ContractImportPage />} />
+        <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
+        <Route path="/contracts/import" element={<ContractImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<DashboardPage />} />
       </Routes>
     </AppLayout>
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Sonner />
-        <BrowserRouter>
-          <AuthenticatedApp />
-        </BrowserRouter>
-      </TooltipProvider>
+function App() {
+  return (
+    <ThemeProvider defaultTheme="light" storageKey="mesquita-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <BrowserRouter>
+            <AuthenticatedApp />
+          </BrowserRouter>
+          <Toaster richColors position="top-right" />
+        </TooltipProvider>
+      </QueryClientProvider>
     </ThemeProvider>
-  </QueryClientProvider>
-);
+  );
+}
 
 export default App;
