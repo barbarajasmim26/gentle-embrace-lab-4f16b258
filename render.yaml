@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: alugue-essa-casa
+    name: mesquita-imoveis
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
@@ -9,6 +9,8 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
