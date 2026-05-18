@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle, Cloud, UserMinus } from "lucide-react";
+import { ArrowLeft, Edit, MessageCircle, Receipt, Upload, FileText, ExternalLink, Phone, DollarSign, MapPin, User, CheckCircle2, Clock, XCircle, Trash2, Plus, RefreshCw, MinusCircle, Cloud, UserMinus, History } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { openWhatsAppChat } from "@/lib/whatsapp";
@@ -20,6 +20,9 @@ import { isOverdue, isPaymentPaid, isNotApplicable } from "@/lib/payment-status"
 import { calculateTenantFees } from "@/lib/fee-utils";
 import { useAppSettings, resolveFees } from "@/hooks/use-settings";
 import RenewContractDialog from "@/components/contracts/RenewContractDialog";
+import { useTenantWhatsAppMessages } from "@/hooks/use-whatsapp-messages";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -49,7 +52,8 @@ export default function TenantProfilePage() {
   const updateTenant = useUpdateTenant();
   const upsertPayment = useUpsertPayment();
   const { data: settings } = useAppSettings();
-  
+  const { data: whatsappMessages } = useTenantWhatsAppMessages(id);
+
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
 
@@ -424,6 +428,38 @@ export default function TenantProfilePage() {
            </Card>
         </div>
       </div>
+
+      {/* WhatsApp History */}
+      {(whatsappMessages && whatsappMessages.length > 0) && (
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="h-4 w-4 text-emerald-600" /> Histórico de WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {whatsappMessages.slice(0, 10).map((msg) => (
+                <div key={msg.id} className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border text-sm">
+                  <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground mb-0.5">
+                      {msg.received_at ? format(new Date(msg.received_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "—"}
+                      {" · "}<span className="capitalize">{msg.direction === "outbound" ? "Enviado" : "Recebido"}</span>
+                    </p>
+                    <p className="text-sm whitespace-pre-line line-clamp-3">{msg.body}</p>
+                  </div>
+                </div>
+              ))}
+              {whatsappMessages.length > 10 && (
+                <p className="text-xs text-center text-muted-foreground pt-1">
+                  + {whatsappMessages.length - 10} mensagem(ns) mais antigas
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
