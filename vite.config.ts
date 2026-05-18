@@ -10,6 +10,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  preview: {
+    allowedHosts: ["mesquita-imoveis-v4.onrender.com"],
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
