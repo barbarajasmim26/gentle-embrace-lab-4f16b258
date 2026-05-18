@@ -6,15 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+const USERNAME_MAP: Record<string, string> = {
+  admesquita: "bbjasmim2@gmail.com",
+};
+
+function resolveEmail(usernameOrEmail: string): string {
+  const lower = usernameOrEmail.trim().toLowerCase();
+  return USERNAME_MAP[lower] ?? usernameOrEmail.trim();
+}
+
 type Step = "form" | "otp";
 
 export default function LoginPage() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("bbjasmim2@gmail.com");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("admesquita");
+  const [password, setPassword] = useState("admin123");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<Step>("form");
   const [loading, setLoading] = useState(false);
+
+  const email = resolveEmail(username);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,12 +33,12 @@ export default function LoginPage() {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
-      toast.error("Senha incorreta. Tente o código por e-mail abaixo.");
+      toast.error("Usuário ou senha incorretos. Tente o código por e-mail abaixo.");
     }
   };
 
   const handleSendOtp = async () => {
-    if (!email) { toast.error("Digite seu e-mail"); return; }
+    if (!email) { toast.error("Digite seu usuário"); return; }
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -116,23 +127,31 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handlePasswordLogin} className="space-y-3">
-            <Input
-              type="email"
-              placeholder="E-mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground font-medium">Usuário</label>
+              <Input
+                type="text"
+                placeholder="Usuário ou e-mail"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground font-medium">Senha</label>
+              <Input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                minLength={6}
+              />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar com senha"}
+              {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 
