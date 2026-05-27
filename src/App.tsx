@@ -23,6 +23,8 @@ import SettingsPage from "./pages/SettingsPage";
 import AutomationPage from "./pages/AutomationPage";
 import FinancialCenterPage from "./pages/FinancialCenterPage";
 import PropertyManagementPage from "./pages/PropertyManagementPage";
+import NotificationCenterPage from "./pages/NotificationCenterPage";
+import OperationalIntelligencePage from "./pages/OperationalIntelligencePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +66,8 @@ function AuthenticatedApp() {
         <Route path="/automation" element={<AutomationPage />} />
         <Route path="/financial" element={<FinancialCenterPage />} />
         <Route path="/properties" element={<PropertyManagementPage />} />
+        <Route path="/notifications" element={<NotificationCenterPage />} />
+        <Route path="/intelligence" element={<OperationalIntelligencePage />} />
         <Route path="/contracts/import" element={<ContractImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<DashboardPage />} />

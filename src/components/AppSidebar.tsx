@@ -4,7 +4,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Zap, DollarSign } from "lucide-react";
+import { Zap, DollarSign, Lightbulb } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ const menuItems = [
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Central Financeira", url: "/financial", icon: DollarSign },
   { title: "Automação", url: "/automation", icon: Zap },
+  { title: "Notificações", url: "/notifications", icon: Bell },
+  { title: "Inteligência", url: "/intelligence", icon: Lightbulb },
   { title: "Recibo", url: "/receipts", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
   { title: "Assistente de IA", url: "/whatsapp-auto", icon: Bot },
