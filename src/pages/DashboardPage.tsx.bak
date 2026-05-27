@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import {
   Users, DollarSign, AlertTriangle, FileText, Bell, Calendar,
   BarChart3, Receipt, Search, ChevronRight, Home,
-  TrendingUp, Plus, Bot, TrendingDown, AlertCircle
+  TrendingUp, Plus, Bot
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { differenceInDays, parseISO, isToday } from "date-fns";
-import { isOverdue, isPaymentPaid, getPaymentStatusInfo } from "@/lib/payment-status";
+import { isOverdue, isPaymentPaid } from "@/lib/payment-status";
 
-export default function DashboardPageEnhanced() {
+export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: tenants } = useTenants("active");
   const { data: allPayments } = useAllPayments(new Date().getFullYear());
@@ -29,58 +29,6 @@ export default function DashboardPageEnhanced() {
     return d >= 0 && d <= 30;
   });
   const alertsCount = expired.length + expiringSoon.length;
-
-  // Calcular inadimplência em tempo real
-  const paymentStats = {
-    paid: 0,
-    pending: 0,
-    overdue: 0,
-    dueToday: 0,
-    totalExpected: 0,
-    totalReceived: 0,
-    totalPending: 0,
-    totalOverdue: 0,
-  };
-
-  activeOnly.forEach((tenant) => {
-    for (let m = 1; m <= month; m++) {
-      const payment = allPayments?.find(p => p.tenant_id === tenant.id && p.month === m && p.year === year);
-      const statusInfo = getPaymentStatusInfo(
-        payment?.status,
-        m,
-        year,
-        tenant.payment_day || 10,
-        tenant.payment_cycle,
-        tenant.entry_date,
-        now
-      );
-
-      const amount = payment?.amount || tenant.rent_amount || 0;
-      paymentStats.totalExpected += amount;
-
-      if (statusInfo.status === "paid" || statusInfo.status === "paid_late" || statusInfo.status === "deposit") {
-        paymentStats.paid++;
-        paymentStats.totalReceived += amount;
-      } else if (statusInfo.status === "overdue") {
-        paymentStats.overdue++;
-        paymentStats.totalPending += amount;
-      } else if (statusInfo.status === "due_today") {
-        paymentStats.dueToday++;
-        paymentStats.totalPending += amount;
-      } else if (statusInfo.status === "pending") {
-        paymentStats.pending++;
-        paymentStats.totalPending += amount;
-      }
-    }
-  });
-
-  const inadimplenciaRate = paymentStats.totalExpected > 0
-    ? Math.round((paymentStats.totalOverdue / paymentStats.totalExpected) * 100)
-    : 0;
-
-  const recebimentoRate = paymentStats.totalExpected > 0
-    ? Math.round((paymentStats.totalReceived / paymentStats.totalExpected) * 100)
-    : 0;
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64">
@@ -119,37 +67,6 @@ export default function DashboardPageEnhanced() {
     },
   ];
 
-  const financialMetrics = [
-    {
-      label: "Taxa de Recebimento",
-      value: `${recebimentoRate}%`,
-      icon: TrendingUp,
-      color: "text-success",
-      bgColor: "bg-success/10",
-    },
-    {
-      label: "Taxa de Inadimplência",
-      value: `${inadimplenciaRate}%`,
-      icon: TrendingDown,
-      color: "text-destructive",
-      bgColor: "bg-destructive/10",
-    },
-    {
-      label: "Recebido este Mês",
-      value: `R$ ${paymentStats.totalReceived.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      icon: DollarSign,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
-    },
-    {
-      label: "Pendente",
-      value: `R$ ${paymentStats.totalPending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      icon: AlertCircle,
-      color: "text-warning",
-      bgColor: "bg-warning/10",
-    },
-  ];
-
   const features = [
     {
       title: "Contratos",
@@ -183,7 +100,7 @@ export default function DashboardPageEnhanced() {
       desc: "Análise de receitas e inadimplência",
       icon: BarChart3,
       iconBg: "bg-accent",
-      badge: `${recebimentoRate}% recebido`,
+      badge: `R$ ${monthlyRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
       badgeColor: "bg-accent/10 text-accent",
       url: "/reports",
     },
@@ -194,7 +111,7 @@ export default function DashboardPageEnhanced() {
       iconBg: "bg-primary",
       badge: "Novo recibo",
       badgeColor: "bg-primary/10 text-primary",
-      url: "/receipts",
+      url: "/receipt",
     },
     {
       title: "Inquilinos",
@@ -221,15 +138,15 @@ export default function DashboardPageEnhanced() {
       iconBg: "bg-emerald-500",
       badge: "Inteligente",
       badgeColor: "bg-emerald-500/10 text-emerald-600",
-      url: "/whatsapp-auto",
+      url: "/ai-assistant",
     },
   ];
 
   const shortcuts = [
-    { label: "Gerar Novo Recibo", icon: Receipt, url: "/receipts", color: "bg-warning hover:bg-warning/90 text-warning-foreground" },
+    { label: "Gerar Novo Recibo", icon: Receipt, url: "/receipt", color: "bg-warning hover:bg-warning/90 text-warning-foreground" },
     { label: "Ver Alertas", icon: Bell, url: "/alerts", color: "bg-destructive hover:bg-destructive/90 text-destructive-foreground" },
     { label: "Ver Atrasados", icon: AlertTriangle, url: "/overdue", color: "bg-primary hover:bg-primary/90 text-primary-foreground" },
-    { label: "Assistente de IA", icon: Bot, url: "/whatsapp-auto", color: "bg-emerald-500 hover:bg-emerald-600 text-white" },
+    { label: "Assistente de IA", icon: Bot, url: "/ai-assistant", color: "bg-emerald-500 hover:bg-emerald-600 text-white" },
   ];
 
   return (
@@ -260,28 +177,6 @@ export default function DashboardPageEnhanced() {
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      {/* Financial Metrics */}
-      <div>
-        <h2 className="text-lg font-bold mb-4">Métricas Financeiras</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {financialMetrics.map((metric) => (
-            <Card key={metric.label} className="rounded-xl">
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">{metric.label}</p>
-                    <p className={`text-2xl font-bold ${metric.color}`}>{metric.value}</p>
-                  </div>
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${metric.bgColor}`}>
-                    <metric.icon className={`h-5 w-5 ${metric.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </div>
 
       {/* Funcionalidades */}

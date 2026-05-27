@@ -4,6 +4,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
+import { Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -11,15 +12,16 @@ import { Button } from "@/components/ui/button";
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Contratos", url: "/tenants", icon: FileText },
-  { title: "Importar Contrato", url: "/import-contract", icon: Upload },
+  { title: "Importar Contrato", url: "/contracts/import", icon: Upload },
   { title: "Ex-Inquilinos", url: "/former-tenants", icon: UserX },
   { title: "Atrasados", url: "/overdue", icon: AlertTriangle },
   { title: "Alertas", url: "/alerts", icon: Bell },
   { title: "Calendário", url: "/calendar", icon: Calendar },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
-  { title: "Recibo", url: "/receipt", icon: Receipt },
+  { title: "Automação", url: "/automation", icon: Zap },
+  { title: "Recibo", url: "/receipts", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
-  { title: "Assistente de IA", url: "/ai-assistant", icon: Bot },
+  { title: "Assistente de IA", url: "/whatsapp-auto", icon: Bot },
 { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
