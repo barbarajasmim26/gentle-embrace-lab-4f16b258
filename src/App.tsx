@@ -21,6 +21,8 @@ import WhatsAppAutoPage from "./pages/WhatsAppAutoPage";
 import ContractImportPage from "./pages/ContractImportPage";
 import SettingsPage from "./pages/SettingsPage";
 import AutomationPage from "./pages/AutomationPage";
+import FinancialCenterPage from "./pages/FinancialCenterPage";
+import PropertyManagementPage from "./pages/PropertyManagementPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +62,8 @@ function AuthenticatedApp() {
         <Route path="/whatsapp" element={<WhatsAppPage />} />
         <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
         <Route path="/automation" element={<AutomationPage />} />
+        <Route path="/financial" element={<FinancialCenterPage />} />
+        <Route path="/properties" element={<PropertyManagementPage />} />
         <Route path="/contracts/import" element={<ContractImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<DashboardPage />} />
