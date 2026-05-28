@@ -88,6 +88,19 @@ export default function DashboardPageEnhanced() {
     </div>
   );
 
+  if (!tenants && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <AlertCircle className="h-12 w-12 text-destructive" />
+        <h2 className="text-xl font-bold">Erro ao carregar dados</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          Não foi possível conectar ao banco de dados. Verifique se as variáveis de ambiente (Supabase) estão configuradas no Render.
+        </p>
+        <Button onClick={() => window.location.reload()}>Tentar Novamente</Button>
+      </div>
+    );
+  }
+
   const totalContracts = tenants?.length || 0;
   const activeContracts = stats?.activeContracts || 0;
   const monthlyRevenue = stats?.monthlyRevenue || 0;
