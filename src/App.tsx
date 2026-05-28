@@ -4,8 +4,6 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { useAuth } from "@/hooks/use-auth";
-import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import TenantsPage from "./pages/TenantsPage";
 import TenantProfilePage from "./pages/TenantProfilePage";
@@ -35,54 +33,36 @@ const queryClient = new QueryClient({
   },
 });
 
-function AuthenticatedApp() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Carregando...</div>
-      </div>
-    );
-  }
-
-  if (!user) return <LoginPage />;
-
-  return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/tenants" element={<TenantsPage />} />
-        <Route path="/tenants/:id" element={<TenantProfilePage />} />
-        <Route path="/former-tenants" element={<FormerTenantsPage />} />
-        <Route path="/overdue" element={<OverduePage />} />
-        <Route path="/alerts" element={<AlertsPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/receipts" element={<ReceiptPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/whatsapp" element={<WhatsAppPage />} />
-        <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
-        <Route path="/automation" element={<AutomationPage />} />
-        <Route path="/financial" element={<FinancialCenterPage />} />
-        <Route path="/properties" element={<PropertyManagementPage />} />
-        <Route path="/notifications" element={<NotificationCenterPage />} />
-        <Route path="/intelligence" element={<OperationalIntelligencePage />} />
-        <Route path="/contracts/import" element={<ContractImportPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<DashboardPage />} />
-      </Routes>
-    </AppLayout>
-  );
-}
-
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="mesquita-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <BrowserRouter>
-            <AuthenticatedApp />
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/tenants" element={<TenantsPage />} />
+                <Route path="/tenants/:id" element={<TenantProfilePage />} />
+                <Route path="/former-tenants" element={<FormerTenantsPage />} />
+                <Route path="/overdue" element={<OverduePage />} />
+                <Route path="/alerts" element={<AlertsPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/receipts" element={<ReceiptPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/whatsapp" element={<WhatsAppPage />} />
+                <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
+                <Route path="/automation" element={<AutomationPage />} />
+                <Route path="/financial" element={<FinancialCenterPage />} />
+                <Route path="/properties" element={<PropertyManagementPage />} />
+                <Route path="/notifications" element={<NotificationCenterPage />} />
+                <Route path="/intelligence" element={<OperationalIntelligencePage />} />
+                <Route path="/contracts/import" element={<ContractImportPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<DashboardPage />} />
+              </Routes>
+            </AppLayout>
           </BrowserRouter>
           <Toaster richColors position="top-right" />
         </TooltipProvider>

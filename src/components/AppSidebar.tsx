@@ -31,7 +31,7 @@ const menuItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut } = useAuth();
+  // const { signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -84,15 +84,7 @@ export function AppSidebar() {
           {theme === "light" ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
           {!collapsed && (theme === "light" ? "Tema Escuro" : "Tema Claro")}
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={signOut}
-          className="w-full justify-start text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 rounded-lg"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          {!collapsed && "Sair"}
-        </Button>
+{/* Botão de Sair Removido */}
         {!collapsed && (
           <p className="text-[10px] text-sidebar-foreground/40 text-center pt-1">Sistema de Aluguel v1.0</p>
         )}
