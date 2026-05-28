@@ -18,24 +18,26 @@ const INITIAL_DATA = {
   tenants: [
     { 
       id: 't1', 
-      name: 'João Silva', 
+      name: 'Exemplo: João Silva', 
       property_id: 'p1', 
-      house_number: 'A', 
+      house_number: 'Casa A', 
       rent_amount: 1200, 
       payment_day: 10, 
       status: 'active', 
-      entry_date: '2025-01-10',
+      entry_date: '2024-01-10',
+      phone: '11999999999',
       created_at: new Date().toISOString() 
     },
     { 
       id: 't2', 
-      name: 'Maria Santos', 
+      name: 'Exemplo: Maria Oliveira', 
       property_id: 'p2', 
-      house_number: '202', 
-      rent_amount: 1500, 
+      house_number: 'Apto 101', 
+      rent_amount: 1800, 
       payment_day: 5, 
       status: 'active', 
-      entry_date: '2025-02-05',
+      entry_date: '2024-05-15',
+      phone: '11888888888',
       created_at: new Date().toISOString() 
     }
   ]
