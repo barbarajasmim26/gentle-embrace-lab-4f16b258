@@ -197,12 +197,12 @@ export default function TenantsPage() {
     return t.name.toLowerCase().includes(q) || t.house_number?.toLowerCase().includes(q) || t.property?.address?.toLowerCase().includes(q);
   });
 
-  const grouped = filtered?.reduce<Record<string, typeof filtered>>((acc, t) => {
+  const grouped: Record<string, any[]> = (filtered || []).reduce((acc: Record<string, any[]>, t: any) => {
     const key = t.property_id || "sem-imovel";
     if (!acc[key]) acc[key] = [];
     acc[key].push(t);
     return acc;
-  }, {}) || {};
+  }, {});
 
   const getPropertyName = (propertyId: string) => {
     if (propertyId === "sem-imovel") return "Sem Condomínio";
