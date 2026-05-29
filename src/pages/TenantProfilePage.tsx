@@ -630,8 +630,36 @@ export default function TenantProfilePage() {
               </span>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancelar</Button>
+            <Button
+              variant="secondary"
+              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              disabled={upsertPayment.isPending}
+              onClick={async () => {
+                await confirmPayment();
+                if (payStatus !== "pending") {
+                  try {
+                    const { generateAndSendReceipt } = await import("@/lib/quick-payment-flow");
+                    await generateAndSendReceipt({
+                      tenant,
+                      amount: calcFinalAmount(),
+                      month: payMonth,
+                      year,
+                      paymentDate: payDate,
+                      paymentMethod: "Pix",
+                      paymentType: payStatus === "deposit" ? "caução" : "aluguel",
+                    });
+                    toast.success("Recibo baixado e WhatsApp aberto!");
+                  } catch (e: any) {
+                    toast.error("Erro ao gerar recibo: " + e.message);
+                  }
+                }
+              }}
+            >
+              <MessageCircle className="mr-1 h-4 w-4" />
+              Confirmar + Recibo WhatsApp
+            </Button>
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={confirmPayment} disabled={upsertPayment.isPending}>
               {upsertPayment.isPending ? "Salvando..." : "Confirmar"}
             </Button>
