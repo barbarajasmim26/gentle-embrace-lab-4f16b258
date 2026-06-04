@@ -70,14 +70,6 @@ export default function WPPConnectPage() {
     refetchInterval: 6000,
   });
 
-  // realtime
-  useEffect(() => {
-    const ch = supabase.channel("wpp-messages-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages" },
-        () => qc.invalidateQueries({ queryKey: ["wpp-messages"] }))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
 
   // Agrupa por telefone
   const conversations = useMemo(() => {
