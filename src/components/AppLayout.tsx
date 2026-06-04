@@ -17,6 +17,7 @@ function useAutoLogin() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  useAutoLogin();
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
