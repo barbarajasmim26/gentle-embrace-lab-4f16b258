@@ -25,6 +25,7 @@ const menuItems = [
   { title: "Recibo", url: "/receipts", icon: Receipt },
   { title: "Busca Rápida", url: "/search", icon: Search },
   { title: "Assistente de IA", url: "/whatsapp-auto", icon: Bot },
+  { title: "Central WhatsApp", url: "/wppconnect", icon: MessageCircle },
 { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
