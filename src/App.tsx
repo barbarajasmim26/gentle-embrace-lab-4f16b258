@@ -16,6 +16,7 @@ import ReceiptPage from "./pages/ReceiptPage";
 import SearchPage from "./pages/SearchPage";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import WhatsAppAutoPage from "./pages/WhatsAppAutoPage";
+import WPPConnectPage from "./pages/WPPConnectPage";
 import ContractImportPage from "./pages/ContractImportPage";
 import SettingsPage from "./pages/SettingsPage";
 import AutomationPage from "./pages/AutomationPage";
@@ -53,6 +54,7 @@ function App() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/whatsapp" element={<WhatsAppPage />} />
                 <Route path="/whatsapp-auto" element={<WhatsAppAutoPage />} />
+                <Route path="/wppconnect" element={<WPPConnectPage />} />
                 <Route path="/automation" element={<AutomationPage />} />
                 <Route path="/financial" element={<FinancialCenterPage />} />
                 <Route path="/properties" element={<PropertyManagementPage />} />
